@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="UTF-16" ?>
+<Application>
+	<forms>
+		<action type="add">
+			<form appformnumber="2000060302" FormType="2000060302" type="4" BorderStyle="4" uid="Reportes" title="Reporte" visible="0" default_button="1" pane="0" color="0" left="389" top="153" width="720" height="460" client_width="704" client_height="422" AutoManaged="0" SupportedModes="0" ObjectType="">
+				<datasources>
+					<dbdatasources>
+						<action type="add"/>
+					</dbdatasources>
+					<userdatasources>
+						<action type="add"/>
+					</userdatasources>
+				</datasources>
+				<Menus/>
+				<items>
+					<action type="add">
+						<item uid="1" type="4" left="22" tab_order="0" width="80" top="401" height="19" visible="1" enabled="1" from_pane="0" to_pane="0" disp_desc="0" right_just="0" description="" linkto="" forecolor="-1" backcolor="-1" text_style="0" font_size="-1" supp_zeros="0" AffectsFormMode="1">
+							<AutoManagedAttribute/>
+							<specific caption="OK"/>
+						</item>
+					</action>
+				</items>
+				<ChooseFromListCollection>
+					<action type="add">
+						<ChooseFromList UniqueID="-1" ObjectType="-1" MultiSelection="0" IsSystem="1"/>
+					</action>
+				</ChooseFromListCollection>
+				<DataBrowser/>
+				<Settings Enabled="0"/>
+			</form>
+		</action>
+	</forms>
+</Application>

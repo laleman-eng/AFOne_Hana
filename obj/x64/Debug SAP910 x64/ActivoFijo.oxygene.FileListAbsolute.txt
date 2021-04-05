@@ -1,0 +1,50 @@
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Interop.SAPbobsCOM.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Interop.SAPbouiCOM.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Core.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Main.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.untLog.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Core.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Main.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.untLog.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.pdb
+Z:\Repaldo VisualK\AFOne Hana\obj\x64\Debug SAP910 x64\ActivoFijo.oxygeneResolveAssemblyReference.cache
+Z:\Repaldo VisualK\AFOne Hana\obj\x64\Debug SAP910 x64\Activo_Fijo__IFRS.MainForm.resources
+Z:\Repaldo VisualK\AFOne Hana\obj\x64\Debug SAP910 x64\AF_IFRS.Properties.Resources.resources
+Z:\Repaldo VisualK\AFOne Hana\obj\x64\Debug SAP910 x64\ActivoFijo.oxygene.GenerateResource.Cache
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.exe
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.pdb
+Z:\Repaldo VisualK\AFOne Hana\obj\x64\Debug SAP910 x64\Activo Fijo - IFRS.exe
+Z:\Repaldo VisualK\AFOne Hana\obj\x64\Debug SAP910 x64\Activo Fijo - IFRS.pdb

@@ -1,0 +1,38 @@
+﻿Addon AFOne
+
+2.207
+	-> Se genera menu para reportes Referencial y Financiero
+		Depreciación Mensual
+		Resumen de Depreciación
+		Cuentas de Activos
+		Análisis de Activos
+		Depreciación Futura
+2.209
+	-> Se cambia largo a campo Grupo de articulo en formulario Activo Fijo, de 8 paso a 30 caracteres
+	-> Se crea funcionalidad de actualizar proyecto en forma masiva, puede ser a todos los grupos o a un grupo especifico,
+           se actualizara los activos que no esten marcados como Dado de Baja
+	-> Se soluciono problema al reversar un proceso de un activo fijo que sea solo IFRS, antes al reversar no actualizaba campo Adiciones
+           del año en etiqueta Depreciación
+	-> Se soluciono problema al contabiliar una Revaloracion Activo IFRS, tanto para contabilizar y revertir
+2.210
+     	-> En la funcionalidad de transferir un activo con el addon, es capaz de crear una transferencia o una entrega en SAP, se debe paramatrizar
+   	en los parametros del addon, si debe crear documento SAP, que tipo de documento (Transferencia o Entrega Venta), si deseo seleccionar
+	con que serie se debe crear, y por ultimo codigo de articulo generico a usar en caso de que activo fijo no este relacionado con uno,
+	para crear transferencia el articulo generico debe ser inventariable. Tambien se creo campo en formulario Ubicacion de activo fijo, con esto
+   	podemos relacionar las bodegas del addon con las de SAP, ademas es necesario que se seleccione un SN para ser ingresado en documento SAP a crear.
+2.211
+	-> Se soluciona problema al correr proceso para activos IFRS y Tributario, en financiero contempla mas de una adicion, antes solo tomaba
+        la ultima ahora las suma
+2.212
+	-> Se soluciona problema al contabilizar con parametro contabilizar con moneda sistema, ahora se realiza contemplando los decimales
+2.213	
+	-> Se soluciona problema al revertir un proceso, no calculaba bien el monto de adiciones del año, especificamente con el mes de Enero
+	-> Se incorpora dos reportes nuevos, Analisis por Periodo Financiera y Analisis por Periodo Referencial
+	-> Se soluciona problema en los meses 12 al procesar el saldo anual, problemas al sumar valores adicion de financiero y referencial
+2.214
+	-> Se arregla problema campo U_ItmGrpCd en query pra reversar proceso por grupo (problema solo en HANA)
+	-> Se agrega validacion en caso de contabilizar Todos los grupos y existen contabilizaciones ya realizadas para el periodo seleccionado,
+ 	no dejara contabilizar
+2.215
+	-> Se quita validacion "Valor de compra no puede ser mayor a valor de compra corregido."
+	-> Se modifico para poder dar de baja un activo referencial (Tributario)

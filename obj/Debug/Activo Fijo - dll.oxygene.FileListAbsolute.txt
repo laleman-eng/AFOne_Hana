@@ -1,0 +1,113 @@
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\ResolveAssemblyReference.cache
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\Interop.SAPbobsCOM.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\Interop.SAPbouiCOM.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\Activo Fijo - dll.oxygene.ResolveComReference.cache
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\Activo_Fijo__IFRS.MainForm.resources
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\AF_IFRS.Properties.Resources.resources
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\GenerateResource-ResGen.read.1.tlog
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\GenerateResource-ResGen.write.1.tlog
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\Activo Fijo - IFRS.exe
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\Activo Fijo - IFRS.pdb
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.Core.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.Dimensions.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.GlobalVid.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.Main.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.MainObjBase.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.MasterDataMatrixForm.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.Matrix_Helper.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.MenuConfFr.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.MultiFunctions.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\Visuald.ReportWindowFr.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.SBOCrystalPreview.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.SBOFunctions.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.SBOGeneralService.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.SBOObjectMg1.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.uEncrypt.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.untLog.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.vkBaseForm.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.vkFormInterface.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\Interop.SAPbouiCOM.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\Interop.SAPbobsCOM.dll
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\bin\Debug\VisualD.GlobalVid.pdb
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\Activo Fijo - IFRS.exe
+C:\Documents and Settings\Administrador\Mis documentos\SBO\AFOne dll\obj\Debug\Activo Fijo - IFRS.pdb
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\Activo Fijo - IFRS.exe
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\Activo Fijo - IFRS.pdb
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.Core.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.Dimensions.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.DynamicOne.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.DynamicOneForm.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.DynamicOneListener.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.GlobalVid.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.Main.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.MainObjBase.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.MasterDataMatrixForm.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.Matrix_Helper.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.MenuConfFr.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.MultiFunctions.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\Visuald.ReportWindowFr.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.SBOCrystalPreview.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.SBOFunctions.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.SBOGeneralService.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.SBOObjectMg1.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.uEncrypt.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.untLog.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.vkBaseForm.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.vkFormInterface.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\VisualD.GlobalVid.pdb
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\Interop.SAPbobsCOM.dll
+E:\Visualk\Proyectos Prism\AFOne dll\bin\Debug\Interop.SAPbouiCOM.dll
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\ResolveAssemblyReference.cache
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\Interop.SAPbobsCOM.dll
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\Interop.SAPbouiCOM.dll
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\Activo Fijo - dll.oxygene.ResolveComReference.cache
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\Activo_Fijo__IFRS.MainForm.resources
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\AF_IFRS.Properties.Resources.resources
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\GenerateResource-ResGen.read.1.tlog
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\GenerateResource-ResGen.write.1.tlog
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\Activo Fijo - IFRS.exe
+E:\Visualk\Proyectos Prism\AFOne dll\obj\Debug\Activo Fijo - IFRS.pdb
+C:\Users\Ivan Orellana Pineda\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - dll.oxygeneResolveAssemblyReference.cache
+C:\Users\Ivan Orellana Pineda\Documents\SBO\AFOne dll\obj\Debug\Interop.SAPbobsCOM.dll
+C:\Users\Ivan Orellana Pineda\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - dll.oxygene.ResolveComReference.cache
+C:\Users\Ivan Orellana Pineda\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - IFRS.exe
+C:\Users\Ivan Orellana Pineda\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - IFRS.pdb
+C:\Users\Ivan Orellana Pineda\Documents\SBO\AFOne dll\obj\Debug\Interop.SAPbouiCOM.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\Activo Fijo - IFRS.exe
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\Activo Fijo - IFRS.pdb
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.Core.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.Dimensions.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.GlobalVid.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.Main.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.MainObjBase.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.MasterDataMatrixForm.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.Matrix_Helper.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.MenuConfFr.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.MultiFunctions.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\Visuald.ReportWindowFr.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.SBOCrystalPreview.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.SBOFunctions.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.SBOGeneralService.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.SBOObjectMg1.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.uEncrypt.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.untLog.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.vkBaseForm.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.vkFormInterface.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\Interop.SAPbouiCOM.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\Interop.SAPbobsCOM.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\bin\Debug\VisualD.GlobalVid.pdb
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - dll.oxygeneResolveAssemblyReference.cache
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Interop.SAPbobsCOM.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Interop.SAPbouiCOM.dll
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - dll.oxygene.ResolveComReference.cache
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Activo_Fijo__IFRS.MainForm.resources
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\AF_IFRS.Properties.Resources.resources
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - dll.oxygene.GenerateResource.Cache
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - IFRS.exe
+C:\Users\iorellana\Documents\SBO\AFOne dll\obj\Debug\Activo Fijo - IFRS.pdb

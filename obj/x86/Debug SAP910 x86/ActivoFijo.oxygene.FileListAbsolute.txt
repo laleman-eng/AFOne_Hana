@@ -1,0 +1,200 @@
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.exe
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Interop.SAPbobsCOM.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Interop.SAPbouiCOM.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Core.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Main.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.untLog.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.dll
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Core.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Main.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.untLog.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.pdb
+Z:\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.pdb
+Z:\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygeneResolveAssemblyReference.cache
+Z:\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo_Fijo__IFRS.MainForm.resources
+Z:\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\AF_IFRS.Properties.Resources.resources
+Z:\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygene.GenerateResource.Cache
+Z:\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.exe
+Z:\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.exe
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\Interop.SAPbobsCOM.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\Interop.SAPbouiCOM.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Core.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Main.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.untLog.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Core.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Main.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.untLog.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygeneResolveAssemblyReference.cache
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo_Fijo__IFRS.MainForm.resources
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\AF_IFRS.Properties.Resources.resources
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygene.GenerateResource.Cache
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.exe
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.exe
+Z:\VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\Interop.SAPbobsCOM.dll
+Z:\VisualK\AFOne Hana\bin\Debug\Interop.SAPbouiCOM.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Core.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Main.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.dll
+Z:\VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.untLog.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.dll
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Core.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Main.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.untLog.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.pdb
+Z:\VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.pdb
+Z:\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygeneResolveAssemblyReference.cache
+Z:\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo_Fijo__IFRS.MainForm.resources
+Z:\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\AF_IFRS.Properties.Resources.resources
+Z:\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygene.GenerateResource.Cache
+Z:\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.exe
+Z:\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.exe
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\Activo Fijo - IFRS.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\Interop.SAPbobsCOM.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\Interop.SAPbouiCOM.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Core.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Main.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.untLog.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.GlobalVid.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.ADOSBOScriptExecute.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.ChooseFromListSubQuery.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Core.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Dimensions.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Main.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MainObjBase.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MasterDataMatrixForm.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.Matrix_Helper.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MenuConfFr.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.MultiFunctions.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\Visuald.ReportWindowFr.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOCrystalPreview.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOFunctions.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOGeneralService.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.SBOObjectMg1.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.uEncrypt.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.untLog.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.vkBaseForm.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\bin\Debug\VisualD.vkFormInterface.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygeneResolveAssemblyReference.cache
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo_Fijo__IFRS.MainForm.resources
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\AF_IFRS.Properties.Resources.resources
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\ActivoFijo.oxygene.GenerateResource.Cache
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.exe
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\obj\x86\Debug SAP910 x86\Activo Fijo - IFRS.pdb

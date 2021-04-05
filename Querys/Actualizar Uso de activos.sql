@@ -1,0 +1,1 @@
+update [@VID_AFUS] set U_YearPer = U_Year*100+u_periodo

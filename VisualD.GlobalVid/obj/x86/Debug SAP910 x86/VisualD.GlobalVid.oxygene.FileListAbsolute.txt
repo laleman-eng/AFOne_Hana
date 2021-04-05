@@ -1,0 +1,84 @@
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbobsCOM.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbouiCOM.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.Properties.Resources.resources
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygene.GenerateResource.Cache
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.dll
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.pdb
+Z:\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygeneResolveAssemblyReference.cache
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbobsCOM.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbouiCOM.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.pdb
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygeneResolveAssemblyReference.cache
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.Properties.Resources.resources
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygene.GenerateResource.Cache
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.dll
+\\vmware-host\Shared Folders\Repaldo VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbobsCOM.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbouiCOM.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.Properties.Resources.resources
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygene.GenerateResource.Cache
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.dll
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.pdb
+Z:\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygeneResolveAssemblyReference.cache
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.GlobalVid.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbobsCOM.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\Interop.SAPbouiCOM.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.SBOFunctions.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.untLog.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Core.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.MultiFunctions.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.Matrix_Helper.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\bin\Debug\VisualD.uEncrypt.pdb
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygeneResolveAssemblyReference.cache
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.Properties.Resources.resources
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.oxygene.GenerateResource.Cache
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.dll
+\\vmware-host\Shared Folders\VisualK\AFOne Hana\VisualD.GlobalVid\obj\x86\Debug SAP910 x86\VisualD.GlobalVid.pdb

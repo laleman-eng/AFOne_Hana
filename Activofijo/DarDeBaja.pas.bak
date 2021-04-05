@@ -1,0 +1,1423 @@
+﻿namespace AF_IFRS.DarDeBaja;
+
+interface
+
+uses
+  SAPbouiCOM, 
+  SAPbobsCOM, 
+  System.Collections.Generic,
+  VisualD.GlobalVid,
+  VisualD.SBOFunctions, 
+  VisualD.vkBaseForm, 
+  VisualD.SBOGeneralService,
+  VisualD.vkFormInterface,
+  Visuald.MultiFunctions;
+
+type
+  TDarDeBaja = class(TvkBaseForm, IvkFormInterface)
+  private
+    { Private Declarations }
+    oRecordSet: SAPbobsCOM.Recordset;
+    Lista:      List<String>;
+    RevBaja:    boolean;
+    Repomo:     Boolean;
+    CorrPos:    Boolean;
+    method   AddChooseFromList(oForm: SAPbouiCOM.Form);
+    method   DarDeBaja(oForm: SAPbouiCOM.Form; oYr, oPer: integer): Boolean;
+    method   AnularDarDeBaja(oForm: SAPbouiCOM.Form; oYr, oPer: integer): Boolean;
+    method   AjustarDecimalesSUM(Valor: double): double;
+  public
+    method   InitForm(uid: string; xmlPath: string; var application:SAPbouiCOM.Application; var company:SAPbobsCOM.Company; var SBOFunctions: VisualD.SBOFunctions.CSBOFunctions ; var _GlobalSettings:TGlobalVid): boolean; reintroduce;
+    method   FormEvent(FormUID: string; var pVal: SAPbouiCOM.ItemEvent; var BubbleEvent: Boolean); reintroduce;
+  end;
+
+implementation
+
+uses
+  System.Globalization;
+
+method   TDarDeBaja.InitForm(uid: string; xmlPath: string; var application:SAPbouiCOM.Application; var company:SAPbobsCOM.Company; var SBOFunctions: VisualD.SBOFunctions.CSBOFunctions ; var _GlobalSettings:TGlobalVid): boolean;
+var
+   oForm : SAPbouiCOM.Form;
+   sql   : String;
+   i     : Integer;
+begin
+   Result := inherited InitForm(uid, xmlPath,var application,var company,var sboFunctions,var _GlobalSettings);
+   // inicializa variable locales
+   Lista   := new List<String>;
+   try
+      if (FCmpny.language = BoSuppLangs.ln_English) then
+         FSBOf.LoadForm(xmlPath,'VID_AFDeBaja_EN.srf', Uid)
+      else
+         FSBOf.LoadForm(xmlPath,'VID_AFDeBaja.srf', Uid);
+
+      oForm := FSBOApp.Forms.Item(uid);
+      oForm.Freeze(True);
+      oForm.AutoManaged    := false;
+      oForm.SupportedModes := 1;             // afm_All
+      oForm.Mode           := SAPbouiCOM.BoFormMode.fm_OK_MODE;
+
+      oRecordSet := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+
+      // Decimales de redondeo
+      oRecordSet.DoQuery('select Decimals from OCRN where CurrCode = ' + TMultiFunctions.QuotedStr(FCmpny.GetCompanyService.GetAdminInfo.LocalCurrency));
+      i := -1;
+      if (not oRecordSet.EoF) then 
+         i := System.Int32(oRecordSet.Fields.Item('Decimals').Value);
+      if (i = -1) then
+         GlobalSettings.LocalCurr_Dec := FCmpny.GetCompanyService.GetAdminInfo.TotalsAccuracy
+      else 
+         GlobalSettings.LocalCurr_Dec := i;
+
+      // Parametros
+      sql := 'Select U_RevBaja, U_Repomo, U_CorPosit from [@VID_AFPA]';
+      oRecordSet.DoQuery(sql);
+      if (oRecordSet.EoF) then
+         raise new Exception('Parametros indefinidos');
+
+      RevBaja := false;
+      if (System.String(oRecordSet.Fields.Item('U_RevBaja').Value).Trim = 'Y') then
+         RevBaja := true;
+
+      Repomo := False;
+      if (System.String(oRecordSet.Fields.Item('U_Repomo').Value).Trim = 'Y') then
+         Repomo := True;
+
+      CorrPos := False;
+      if (System.String(oRecordSet.Fields.Item('U_CorPosit').Value).Trim = 'Y') then
+         CorrPos := True;
+
+      // Grupos
+      oRecordSet.DoQuery('select  code,  name from [@VID_AFGR] order by name');
+      FSBOf.FillCombo(ComboBox(oForm.Items.Item('ItmGrpCd').Specific), var oRecordSet, true);
+      // CFL CardCode
+      AddChooseFromList(oForm);
+      EditText(oForm.Items.Item('ActCode').Specific).ChooseFromListUID   := 'CFL1';
+      EditText(oForm.Items.Item('ActCode').Specific).ChooseFromListAlias := 'U_ActCode';
+
+      oForm.DataSources.UserDataSources.Add('DSEmpName',SAPbouiCOM.BoDataType.dt_LONG_TEXT,100);
+      EditText(oForm.Items.Item('EmpName').Specific).DataBind.SetBound(true,'','DSEmpName');
+
+      oForm.DataSources.UserDataSources.Add('DSValResi',SAPbouiCOM.BoDataType.dt_SUM,12);
+      oForm.DataSources.UserDataSources.Add('DSValNeto',SAPbouiCOM.BoDataType.dt_SUM,12);
+      EditText(oForm.Items.Item('ValorResi').Specific).DataBind.SetBound(true,'','DSValResi');
+      EditText(oForm.Items.Item('ValorNeto').Specific).DataBind.SetBound(true,'','DSValNeto');
+      oForm.Freeze(False);
+      oForm.Update;
+
+      oForm.Visible := true;
+   except
+      on e:exception do begin
+         FSBOApp.StatusBar.SetText(e.Message , BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+         OutLog('FormEvent: ' + e.Message + ' - ' + e.StackTrace);
+      end;
+   end;
+end;
+
+method TDarDeBaja.AddChooseFromList(oForm: SAPbouiCOM.Form);
+var
+   oCFLs: SAPbouiCOM.ChooseFromListCollection;
+   oCFL:  SAPbouiCOM.ChooseFromList;
+   oCFLCreationParams: SAPbouiCOM.ChooseFromListCreationParams;
+   oCons: SAPbouiCOM.Conditions;
+   oCon:  SAPbouiCOM.Condition;
+begin
+   oCFLs := oForm.ChooseFromLists;
+   oCFLCreationParams := ChooseFromListCreationParams(FSBOApp.CreateObject(SAPbouiCOM.BoCreatableObjectType.cot_ChooseFromListCreationParams));
+
+   oCFLCreationParams.MultiSelection := False;
+   oCFLCreationParams.ObjectType := 'VID_mAFAS';    // 1VID_mAFGR => Grupos
+   oCFLCreationParams.UniqueID   := 'CFL1';
+   oCFL := oCFLs.Add(oCFLCreationParams);
+
+   oCons := oCFL.GetConditions();
+   oCon := oCons.Add();
+   oCon.Alias := 'U_ActTipo';
+   oCon.Operation := BoConditionOperation.co_IS_NULL;
+   oCon.Relationship := BoConditionRelationship.cr_OR;
+   oCon := oCons.Add();
+   oCon.Alias := 'U_ActTipo';
+   oCon.Operation := BoConditionOperation.co_NOT_EQUAL;
+   oCon.CondVal := 'T';
+   oCFL.SetConditions(oCons);
+end;
+
+method TDarDeBaja.FormEvent(FormUID: string; var pVal: SAPbouiCOM.ItemEvent; var BubbleEvent: Boolean);
+var
+   oForm           : SAPbouiCOM.Form;
+   sValue          : string;
+   oDataTable      : SAPbouiCOM.DataTable;
+   oDBDSH          : SAPbouiCOM.DBDataSource;
+   oCons           : SAPbouiCOM.Conditions;
+   oCon            : SAPbouiCOM.Condition;
+   Fecha           : DateTime;
+   vPer            : integer;
+   vYr             : integer;
+   s               : string;
+   s1,s2           : string;
+   IniYr, IniPr    : string;
+   OperacionRealizada : Boolean := false;
+begin
+   inherited FormEvent(FormUID, var pVal, var BubbleEvent);
+
+   oForm := FSBOApp.Forms.Item(pVal.FormUID);
+   oDBDSH  := oForm.DataSources.DBDataSources.Item('@VID_AFAS');
+
+   try
+    try
+     oForm.Freeze(True);
+
+      // CFL
+      if (pVal.EventType = BoEventTypes.et_CHOOSE_FROM_LIST) and (pVal.BeforeAction = False) then begin
+         if (pVal.ItemUID = 'ActCode')  then begin
+            oDataTable := SAPbouiCOM.IChooseFromListEvent(pVal).SelectedObjects;
+            sValue := '';
+            try
+               sValue  := System.String(oDataTable.GetValue('U_ActCode', 0));
+            except
+               ;
+            end;
+            if (sValue <> '') then begin
+               oCons := new SAPbouiCOM.ConditionsClass;
+               oCon := oCons.Add();
+
+               oCon.Alias := 'U_ActCode';
+               oCon.Operation := BoConditionOperation.co_EQUAL;
+               oCon.CondVal := sValue;
+               oDBDSH.Query(oCons);
+
+               s := oDBDSH.GetValue('U_EmpId', 0);
+               if (s <> '') then begin
+                  oRecordSet.DoQuery ('Select empid, firstname, lastname, branch from ohem where EmpId = ' + s);
+                  s := System.String(oRecordSet.Fields.Item('lastname').Value) + ', ' +
+                       System.String(oRecordSet.Fields.Item('firstname').Value);
+               end;
+               oForm.DataSources.UserDataSources.Item('DSEmpName').Value := s;
+
+               IniYr := oDBDSH.GetValue('U_NextYear', 0);
+               IniPr := TMultiFunctions.inttostr(TMultiFunctions.strtoint(oDBDSH.GetValue('U_NextPer', 0)) - 1);
+
+               if (TMultiFunctions.StrToInt(IniPr) = 0) then begin
+                 IniYr := TMultiFunctions.inttostr(TMultiFunctions.strtoint(IniYr) - 1);
+                 IniPr := '12';
+               end;
+
+               s1 := oForm.DataSources.DBDataSources.Item('@VID_AFAS').GetValue('U_InitYear', 0);
+               if (s1 = '')  then
+                  s1 := '0';
+               s2 := oForm.DataSources.DBDataSources.Item('@VID_AFAS').GetValue('U_InitPer', 0);
+               if (s2 = '')  then
+                  s2 := '0';
+
+               s := FSBOf.DoubleToStr( FSBOf.StrToDouble(oDBDSH.GetValue('U_CurVal',   0)) +
+                                       FSBOf.StrToDouble(oDBDSH.GetValue('U_CorAnuAc', 0)) +
+                                       FSBOf.StrToDouble(oDBDSH.GetValue('U_AdicAnuC', 0)) );
+               oForm.DataSources.UserDataSources.Item('DSValNeto').ValueEx := s;
+
+               s := FSBOf.DoubleToStr( FSBOf.StrToDouble(s) -
+                                       (FSBOf.StrToDouble(oDBDSH.GetValue('U_DepAcum', 0))  +
+                                        FSBOf.StrToDouble(oDBDSH.GetValue('U_CorAnuDe', 0)) +
+                                        FSBOf.StrToDouble(oDBDSH.GetValue('U_DepreAnu', 0)) -
+                                        FSBOf.StrToDouble(ODBDSH.GetValue('U_ValResid', 0)))   );
+               oForm.DataSources.UserDataSources.Item('DSValResi').ValueEx := s;
+
+               if (oForm.DataSources.DBDataSources.Item('@VID_AFAS').GetValue('U_DeBaja', 0) = 'Y') then begin
+                  oForm.Items.Item('BtnBaja'  ).Enabled := false;
+                  oForm.Items.Item('BtnBaja'  ).Visible := false;
+                  oForm.Items.Item('btnAnular').Visible := true;
+                  oForm.ITems.Item('BajaFec'  ).Enabled := false;
+                  //Button(oForm.Items.Item('BtnBaja').Specific).Caption := 'Anular Baja';
+               end
+               else begin
+                  oForm.Items.Item('BtnBaja'  ).Enabled := true;
+                  oForm.Items.Item('BtnBaja'  ).Visible := true;
+                  oForm.Items.Item('btnAnular').Visible := false;
+                  oForm.ITems.Item('BajaFec'  ).Enabled := true;
+                  if (FCmpny.language = BoSuppLangs.ln_English) then
+                      Button(oForm.Items.Item('BtnBaja').Specific).Caption := 'Retirement'
+                  else
+                      Button(oForm.Items.Item('BtnBaja').Specific).Caption := 'Dar de Baja';
+               end;
+
+
+               oForm.Mode := BoFormmode.fm_OK_MODE;
+               oForm.Items.Item('InDate').Update;
+               oForm.Items.Item('ActName').Update;
+               oForm.Items.Item('ItmGrpCd').Update;
+               oForm.Items.Item('InDate').Update;
+               oForm.Items.Item('InitYear').Update;
+               oForm.Items.Item('InitPer').Update;
+               oForm.Items.Item('EmpId').Update;
+               oForm.Items.Item('EmpName').Update;
+               oForm.Items.Item('VidaUtil').Update;
+               oForm.Items.Item('PerDepre').Update;
+               oForm.Items.Item('NextYear').Update;
+               oForm.Items.Item('NextPer').Update;
+               oForm.Items.Item('OriVal').Update;
+               oForm.Items.Item('OriValCo').Update;
+               oForm.Items.Item('PorResid').Update;
+               oForm.Items.Item('OriPerDp').Update;
+               oForm.Items.Item('OriDepre').Update;
+               oForm.Items.Item('LocName').Update;
+
+               oForm.Update;
+            end
+            ;
+         end;
+      end
+
+      else if (pVal.EventType = BoEventTypes.et_ITEM_PRESSED) and (pVal.BeforeAction = True) then begin
+         if (pVal.ItemUID = 'btnAnular') then begin
+            if (oForm.DataSources.DBDataSources.Item('@VID_AFAS').GetValue('U_DeBaja', 0) <> 'Y') then 
+               exit;
+
+            Fecha := FSBOf.StrToDate(EditText(oForm.Items.Item('BajaFec').Specific).Value);
+            vPer  := TMultiFunctions.strToint(oDBDSH.GetValue('U_NextPer' , 0));
+            vYr   := TMultiFunctions.strToint(oDBDSH.GetValue('U_NextYear', 0));
+
+            if (vPer = 1) then begin
+               vYr  := vYr - 1;
+               vPer := 12;
+            end
+            else
+               vPer := vPer - 1;
+
+            if (2 = FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Anular_Baja_QM], 1, 'Cancel', 'Ok', '')) then begin
+               if (AnularDarDeBaja(oForm, vYr, vPer)) then
+                  OperacionRealizada := true;
+            end; 
+         end;
+
+         if (pVal.ItemUID = 'BtnBaja') then begin
+            if (oForm.DataSources.DBDataSources.Item('@VID_AFAS').GetValue('U_DeBaja', 0) = 'Y') then
+               exit;
+
+            Fecha := FSBOf.StrToDate(EditText(oForm.Items.Item('BajaFec').Specific).Value);
+
+            if (Repomo) then begin
+               // Periodo en que se da de baja NO debe estar contabilizado
+               s := "select U_PostFlag from [@VID_AFAC] " +
+                    " where Code = '" + oDBDSH.GetValue('Code', 0).Trim + "'" +
+                    "   and U_Year = " + Fecha.Year.ToString +
+                    "   and U_Periodo = " + Fecha.Month.ToString;
+               oRecordSet.DoQuery(s);
+               oRecordSet.MoveFirst;
+               if (not oRecordSet.EoF) then begin
+                  FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Per_Post_Actividad], BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+                  exit;
+               end;
+
+               s := "select isnull(U_PostFlag, 'N') U_PostFlag from [@VID_AFAC] " +
+                    " where Code = '" + oDBDSH.GetValue('Code', 0).Trim + "'" +
+                    "   and U_Year = " + Fecha.AddMonths(-1).Year.ToString +
+                    "   and U_Periodo = " + Fecha.AddMonths(-1).Month.ToString;
+               oRecordSet.DoQuery(s);
+               oRecordSet.MoveFirst;
+               if (oRecordSet.EoF) then begin
+                  FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Depreciar_Activo], BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+                  exit;
+               end;
+               if (System.String(oRecordSet.Fields.Item('U_PostFlag').Value) <> 'Y') then begin
+                  FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Contabilizar_Activo], BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+                  exit;
+               end;
+
+               if (2 = FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Dar_Baja_QM], 1, 'Cancel', 'Ok', '')) then begin
+                   if (DarDeBaja(oForm, Fecha.Year, Fecha.Month)) then
+                      OperacionRealizada := true;
+               end;
+            end
+            else begin
+               // Periodo en que se da de baja debe estar contabilizado
+               s := "select U_PostFlag from [@VID_AFAC] " +
+                    " where Code = '" + oDBDSH.GetValue('Code', 0).Trim + "'" +
+                    "   and U_Year = " + Fecha.AddMonths(1).Year.ToString +
+                    "   and U_Periodo = " + Fecha.AddMonths(1).Month.ToString;
+               oRecordSet.DoQuery(s);
+               oRecordSet.MoveFirst;
+               if (not oRecordSet.EoF) then begin
+                  FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Per_Post_Actividad], BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+                  exit;
+               end;
+
+               s := "select isnull(U_PostFlag, 'N') U_PostFlag from [@VID_AFAC] " +
+                    " where Code = '" + oDBDSH.GetValue('Code', 0).Trim + "'" +
+                    "   and U_Year = " + Fecha.Year.ToString +
+                    "   and U_Periodo = " + Fecha.Month.ToString;
+               oRecordSet.DoQuery(s);
+               oRecordSet.MoveFirst;
+               if (oRecordSet.EoF) then begin
+                  FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Depreciar_Activo], BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+                  exit;
+               end;
+               if (System.String(oRecordSet.Fields.Item('U_PostFlag').Value) <> 'Y') then begin
+                  FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Contabilizar_Activo], BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+                  exit;
+               end;
+
+               if (2 = FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Dar_Baja_QM], 1, 'Cancel', 'Ok', '')) then begin
+                   if (DarDeBaja(oForm, Fecha.Year, Fecha.Month)) then
+                      OperacionRealizada := true;
+               end;
+            end;
+         end;
+      end
+
+    finally 
+      oForm.Freeze(False);
+      if (OperacionRealizada) then
+         oForm.Close;
+    end;
+   except
+      on e: exception do begin
+         FSBOApp.StatusBar.SetText(e.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+         OutLog('FormEvent: ' + e.Message + ' - ' + e.StackTrace);
+      end;
+   end;
+end;
+
+method TDarDeBaja.DarDeBaja(oForm: SAPbouiCOM.Form; oYr, oPer: integer): Boolean;
+var
+   oJEntries         : SAPbobsCOM.JournalEntries;
+   oDBDS             : SAPbouiCOM.DBDataSource;
+   oActivos          : SAPbobsCOM.GeneralService;
+   oActivosData      : SAPbobsCOM.GeneralData;
+   oActivosParameter : SAPbobsCOM.GeneralDataParams;
+   s                 : string;
+   Fecha             : DateTime;
+   ErrCode           : integer;
+   ErrMsg            : string;
+   sql               : string;
+   oValCA            : double;
+   oValCD            : double;
+   oValDe            : double;
+   oValAct           : double;
+   oFactor           : double;
+   oValActF          : double;
+   oValDepA          : double;
+   oValCASys         : double;
+   oValCDSys         : double;
+   oValDeSys         : double;
+   oValActsys        : double;
+   oValActFSys       : double;
+   oValDepASys       : double;
+   oTasaFija         : boolean;
+
+   lin               : Integer;
+   oPerIngreso       : Integer;
+   oYrIngreso        : Integer;
+   oCtoCosto         : String;
+   oDimension        : Integer;
+begin
+   try
+      result := false;
+
+      oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+      oDBDS     := oForm.DataSources.DBDataSources.Item('@VID_AFAS');
+
+      oTasaFija := false;
+      oRecordSet.DoQuery('Select U_ConMSCFi from [@VID_AFPA]');
+      if (not oRecordSet.EoF) then 
+         if (System.String(oRecordSet.Fields.Item('U_ConMSCFi').Value) = 'Y') then 
+            oTasaFija := true;
+
+      oCtoCosto := oDBDS.GetValue('U_ProfitCt', 0).Trim;
+      oRecordSet.DoQuery('Select isnull(cc.DimCode, 1) DimCode ' +
+                         '  from OPRC cc ' +
+                         ' where cc.PrcCode = ' + TMultiFunctions.Quotedstr(oCtoCosto));
+      if (not oRecordSet.EoF) then
+         oDimension := System.Int32(oRecordSet.Fields.Item('DimCode').Value)
+      else 
+         oDimension := 0;
+
+      Fecha       := FSBOf.StrToDate(EditText(oForm.Items.Item('BajaFec').Specific).Value);
+      oPerIngreso := FSBOf.StrToInteger(oDBDS.GetValue('U_InitPer'  , 0));
+      oYrIngreso  := FSBOf.StrToInteger(oDBDS.GetValue('U_InitYear' , 0));
+
+      if (Repomo) then begin
+         if (oPer = 1) then begin
+            oYr  := oYr - 1;
+            oPer := 12;
+         end
+         else
+            oPer := oPer - 1;
+
+         if ((oPer = oPerIngreso) and (oYr = oYrIngreso)) or (oYr < oYrIngreso) or ((oPer < oPerIngreso) and (oYr = oYrIngreso)) then begin
+         end
+         else begin
+            sql := 'Select d.U_CorrActi, d.U_CorrDepr, d.U_Deprecia ' +
+                   '  from [@vid_afac] d inner join [@vid_afas] h on d.code = h.code ' +
+                   ' where h.u_actcode = ' + TMultiFunctions.Quotedstr(oDBDS.GetValue('U_ActCode', 0).Trim) +
+                   '   and d.U_Year    = ' + TMultiFunctions.inttostr(oYr) +
+                   '   and d.U_Periodo = ' + TMultiFunctions.inttostr(oPer);
+            oRecordSet.DoQuery(sql);
+            if (oRecordSet.EoF) then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Baja_Info_Incompleta]);
+         end;
+
+         oFactor := 0;
+
+         oValAct  := FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC' , 0));
+         oValDepA := FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu' , 0));
+         oValAct  := AjustarDecimalesSUM(oValAct);
+         oValDepA := AjustarDecimalesSUM(oValDepA);
+         oValDe   := oValAct - oValDepA;
+
+         if (oTasaFija) then begin
+            oValActSys  := (FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC' , 0))) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValDepASys := (FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu' , 0))) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValActSys  := AjustarDecimalesSUM(oValActSys);
+            oValDepASys := AjustarDecimalesSUM(oValDepASys);
+            oValDeSys   := oValActSys - oValDepASys;
+         end;
+
+         oJEntries.ReferenceDate := Fecha;
+         oJEntries.TaxDate       := Fecha;
+         oJEntries.DueDate       := Fecha;
+         oJEntries.Reference     := 'AF-Baja';
+         oJEntries.Reference2    := oDBDS.GetValue('U_ActCode', 0).Trim;
+         oJEntries.TransactionCode := '';
+         oJEntries.ProjectCode     := oDBDS.GetValue('U_Project', 0).Trim;
+
+         lin := 0;
+
+            // U_Deprecia
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaDepAc', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValDepA > 0) then
+               oJEntries.Lines.Debit := oValDepA
+            else
+               oJEntries.Lines.Credit  := oValDepA * (-1);
+            if (oTasaFija) then begin
+               if (oValDepASys > 0) then
+                  oJEntries.Lines.DebitSys  := oValDepASys
+               else
+                  oJEntries.Lines.CreditSys := oValDepASys * (-1);
+            end;
+            inc(lin);
+
+            // U_Venta
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaAdqAc', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValAct > 0) then
+               oJEntries.Lines.Credit := oValAct
+            else
+               oJEntries.Lines.Debit  := (oValAct) * (-1);
+            if (oTasaFija) then begin
+               if (oValActSys > 0) then
+                  oJEntries.Lines.CreditSys := oValActSys
+               else
+                  oJEntries.Lines.DebitSys  := oValActSys * (-1);
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaGasBj', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValDe > 0) then
+               oJEntries.Lines.Debit  := oValDe
+            else
+               oJEntries.Lines.Credit := oValDe * (-1);
+            if (oTasaFija) then begin
+               if (oValDeSys > 0) then
+                  oJEntries.Lines.DebitSys  := oValDeSys
+               else
+                  oJEntries.Lines.CreditSys := oValDeSys * (-1);
+            end;
+      end
+      else begin
+         sql := 'Select d.U_CorrActi, d.U_CorrDepr, d.U_Deprecia ' +
+                '  from [@vid_afac] d inner join [@vid_afas] h on d.code = h.code ' +
+                ' where h.u_actcode = ' + TMultiFunctions.Quotedstr(oDBDS.GetValue('U_ActCode', 0).Trim) +
+                '   and d.U_Year    = ' + TMultiFunctions.inttostr(oYr) +
+                '   and d.U_Periodo = ' + TMultiFunctions.inttostr(oPer);
+         oRecordSet.DoQuery(sql);
+         if (oRecordSet.EoF) then
+            raise new Exception('Información incompleta para el activo a dar de baja ');
+
+         oFactor := 1.0 - Double(Fecha.Day)/Fecha.DaysInMonth(Fecha.Year, Fecha.Month);;
+
+         oValCA  := System.Double(oRecordSet.Fields.Item('U_CorrActi').Value) * oFactor;
+         oValCD  := System.Double(oRecordSet.Fields.Item('U_CorrDepr').Value) * oFactor;
+         oValCA  := AjustarDecimalesSUM(oValCA);
+         oValCD  := AjustarDecimalesSUM(oValCD);
+         if (CorrPos) then begin
+            if (oValCA < 0) then
+               oValCA := 0; 
+            if (oValCD < 0) then
+               oValCD := 0; 
+         end;
+
+         oValDe  := System.Double(oRecordSet.Fields.Item('U_Deprecia').Value) * oFactor;
+         oValDe  := AjustarDecimalesSUM(oValDe);
+         oValAct := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0))) + AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0))) +
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC' , 0))) -
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0))) - AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0))) -
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu', 0))) - oValCA + oValCD + oValDe;
+         oValActF := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal' , 0))) + AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0))) +
+                     AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC' , 0))) - oValCA;
+         oValDepA := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum', 0))) + AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0))) +
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu', 0))) - oValCD - oValDe;
+
+         if (oTasaFija) then begin
+            oValCASys  := System.Double(oRecordSet.Fields.Item('U_CorrActi').Value) * oFactor / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValCDSys  := System.Double(oRecordSet.Fields.Item('U_CorrDepr').Value) * oFactor / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValCASys  := AjustarDecimalesSUM(oValCASys);
+            oValCDSys  := AjustarDecimalesSUM(oValCDSys);
+            if (CorrPos) then begin
+               if (oValCASys < 0) then
+                  oValCASys := 0; 
+               if (oValCDSys < 0) then
+                  oValCDSys := 0; 
+            end;
+
+            oValDeSys  := System.Double(oRecordSet.Fields.Item('U_Deprecia').Value) * oFactor / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValDeSys  := AjustarDecimalesSUM(oValDeSys);
+            oValActSys := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) + 
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) +
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) -
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - 
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) -
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - oValCASys + oValCDSys + oValDeSys;
+            oValActFSys := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) + 
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) +
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - oValCASys;
+            oValDepASys := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) + 
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) +
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - oValCDSys - oValDeSys;
+         end;
+
+         oJEntries.ReferenceDate := Fecha;
+         oJEntries.TaxDate       := Fecha;
+         oJEntries.DueDate       := Fecha;
+         oJEntries.Reference     := 'AF-Baja';
+         oJEntries.Reference2    := oDBDS.GetValue('U_ActCode', 0).Trim;
+         oJEntries.TransactionCode := '';
+         oJEntries.ProjectCode     := oDBDS.GetValue('U_Project', 0).Trim;
+
+         lin := 0;
+         // U_CorrActi
+         if (oValCA <> 0) then begin
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaActFi', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCA > 0) then
+               oJEntries.Lines.Credit   := oValCA
+            else
+               oJEntries.Lines.Debit  := oValCA * (-1);
+            if (oTasaFija) then begin
+               if (oValCASys > 0) then
+                  oJEntries.Lines.CreditSys := oValCASys
+               else
+                  oJEntries.Lines.DebitSys  := oValCASys * (-1);
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaCorAF', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCA > 0) then
+               oJEntries.Lines.Debit := oValCA
+            else
+               oJEntries.Lines.Credit  := oValCA * (-1);
+            if (oTasaFija) then begin
+               if (oValCASys > 0) then
+                  oJEntries.Lines.DebitSys  := oValCASys
+               else
+                  oJEntries.Lines.CreditSys := oValCASys * (-1);
+            end;
+            inc(lin);
+         end;
+
+            // U_CorrDepr
+         if (oValCD <> 0) and (not Repomo) then begin
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaDepAc', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCD > 0) then
+               oJEntries.Lines.Debit := oValCD
+            else
+               oJEntries.Lines.Credit  := oValCD * (-1);
+            if (oTasaFija) then begin
+               if (oValCDSys > 0) then
+                  oJEntries.Lines.DebitSys  := oValCDSys
+               else
+                  oJEntries.Lines.CreditSys := oValCDSys * (-1);
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaCorDA', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCD > 0) then
+               oJEntries.Lines.Credit := oValCD
+            else
+               oJEntries.Lines.Debit  := oValCD * (-1);
+            if (oTasaFija) then begin
+               if (oValCDSys > 0) then
+                  oJEntries.Lines.CreditSys := oValCDSys
+               else
+                  oJEntries.Lines.DebitSys  := oValCDSys * (-1);
+            end;
+            inc(lin);
+         end;
+
+         // U_Deprecia
+         if (lin > 0) then
+            oJEntries.lines.Add;
+         oJEntries.Lines.SetCurrentLine(lin);
+         oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaDepAc', 0).Trim;
+         oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+         if (RevBaja) then begin
+            if (oValDepA > 0) then
+               oJEntries.Lines.Debit := oValDepA
+            else
+               oJEntries.Lines.Credit  := oValDepA * (-1);
+            if (oTasaFija) then begin
+               if (oValDepASys > 0) then
+                  oJEntries.Lines.DebitSys  := oValDepASys
+               else
+                  oJEntries.Lines.CreditSys := oValDepASys * (-1);
+            end;
+         end
+         else begin
+            if (oValDe > 0) then
+               oJEntries.Lines.Debit := oValDe
+            else
+               oJEntries.Lines.Credit  := oValDe * (-1);
+            if (oTasaFija) then begin
+               if (oValDeSys > 0) then
+                  oJEntries.Lines.DebitSys  := oValDeSys
+               else
+                  oJEntries.Lines.CreditSys := oValDeSys * (-1);
+            end;
+         end;
+         inc(lin);
+
+         if (lin > 0) then
+            oJEntries.lines.Add;
+         oJEntries.Lines.SetCurrentLine(lin);
+         oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaGasDe', 0).Trim;
+         oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValDe > 0) then
+               oJEntries.Lines.Credit := oValDe
+            else
+               oJEntries.Lines.Debit  := oValDe * (-1);
+            if (oTasaFija) then begin
+               if (oValDeSys > 0) then
+                  oJEntries.Lines.CreditSys := oValDeSys
+               else
+                  oJEntries.Lines.DebitSys  := oValDeSys * (-1);
+            end;
+         inc(lin);
+
+         // U_Venta
+         if (lin > 0) then
+            oJEntries.lines.Add;
+         oJEntries.Lines.SetCurrentLine(lin);
+         oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaActFi', 0).Trim;
+         oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+         if (RevBaja) then begin
+            if (oValActF-oValDe > 0) then
+               oJEntries.Lines.Credit := oValActF-oValDe
+            else
+               oJEntries.Lines.Debit  := (oValActF-oValDe) * (-1);
+            if (oTasaFija) then begin
+               if (oValActFSys-oValDeSys > 0) then
+                  oJEntries.Lines.CreditSys := oValActFSys-oValDeSys
+               else
+                  oJEntries.Lines.DebitSys  := (oValActFSys-oValDeSys) * (-1);
+            end;
+         end
+         else begin
+            if (oValAct > 0) then
+               oJEntries.Lines.Credit := oValAct
+            else
+               oJEntries.Lines.Debit  := oValAct * (-1);
+            if (oTasaFija) then begin
+               if (oValActSys > 0) then
+                  oJEntries.Lines.CreditSys := oValActSys
+               else
+                  oJEntries.Lines.DebitSys  := oValActSys * (-1);
+            end;
+         end;
+         inc(lin);
+
+         if (lin > 0) then
+            oJEntries.lines.Add;
+         oJEntries.Lines.SetCurrentLine(lin);
+         oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaGasBj', 0).Trim;
+         oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValAct > 0) then
+               oJEntries.Lines.Debit := oValAct
+            else
+               oJEntries.Lines.Credit  := oValAct * (-1);
+            if (oTasaFija) then begin
+               if (oValActSys > 0) then
+                  oJEntries.Lines.DebitSys  := oValActSys
+               else
+                  oJEntries.Lines.CreditSys := oValActSys * (-1);
+            end;
+      end;
+
+      try
+         oActivos := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFAS'));
+
+         oActivosParameter := SAPbobsCOM.GeneralDataParams(oActivos.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+         oRecordSet.DoQuery('Select Code from [@VID_AFAS] where U_ActCode = ' + TMultiFunctions.Quotedstr(EditText(oForm.Items.Item('ActCode').Specific).Value) );
+         s := System.string(oRecordSet.Fields.Item('Code').Value);
+         oActivosParameter.SetProperty('Code', s);
+
+         oActivosData := oActivos.GetByParams(oActivosParameter);
+
+         s := 'Y';
+         oActivosData.SetProperty('U_DeBaja' , s);
+         oActivosData.SetProperty('U_ValBaja', oValDe);
+         oActivosData.SetProperty('U_BajaFec', FSBOf.StrToDate(EditText(oForm.Items.Item('BajaFec').Specific).Value));
+
+         FSBOf.Cmpny.StartTransaction;
+         errCode := oJEntries.Add;
+         if (errCode <> 0) then begin
+            FCmpny.GetLastError(out errCode, out errMsg);
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Error_baja] + TMultiFunctions.inttostr(errCode) + ' - ' + errMsg);
+         end;
+
+         oActivos.Update(oActivosData);
+
+         FSBOf.Cmpny.EndTransaction(BoWfTransOpt.wf_Commit);
+         result := true;
+
+         FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Baja_activo] + 
+                                   EditText(oForm.Items.Item('ActCode').Specific).Value + 
+                                   GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Dado_baja], 
+                                   BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success);
+      except
+         on e: exception do begin
+            if (FSBOf.Cmpny.InTransaction) then
+               FSBOf.Cmpny.EndTransaction(BoWfTransOpt.wf_RollBack);
+            FSBOApp.StatusBar.SetText(e.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+            OutLog("Dar de baja: " + e.Message + '  ** Trace: ' + e.StackTrace);
+         end;
+      end;
+   finally
+      FSBOf._ReleaseCOMObject(oJEntries);
+   end;
+end;
+
+method TDarDeBaja.AnularDarDeBaja(oForm: SAPbouiCOM.Form; oYr, oPer: integer): Boolean;
+var
+   oJEntries         : SAPbobsCOM.JournalEntries;
+   oDBDS             : SAPbouiCOM.DBDataSource;
+   oActivos          : SAPbobsCOM.GeneralService;
+   oActivosData      : SAPbobsCOM.GeneralData;
+   oActivosParameter : SAPbobsCOM.GeneralDataParams;
+   s                 : string;
+   Fecha             : DateTime;
+   ErrCode           : integer;
+   ErrMsg            : string;
+   sql               : string;
+   oValCA            : double;
+   oValCD            : double;
+   oValDe            : double;
+   oValAct           : double;
+   oFactor           : double;
+   oValActF          : double;
+   oValDepA          : double;
+   oValCASys         : double;
+   oValCDSys         : double;
+   oValDeSys         : double;
+   oValActsys        : double;
+   oValActFSys       : double;
+   oValDepASys       : double;
+   oTasaFija         : boolean;
+
+   lin               : Integer;
+   oPerIngreso       : Integer;
+   oYrIngreso        : Integer;
+   oCtoCosto         : String;
+   oDimension        : Integer;
+begin
+   try
+      result := false;
+
+      oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+      oDBDS     := oForm.DataSources.DBDataSources.Item('@VID_AFAS');
+
+      oTasaFija := false;
+      oRecordSet.DoQuery('Select U_ConMSCFi from [@VID_AFPA]');
+      if (not oRecordSet.EoF) then 
+         if (System.String(oRecordSet.Fields.Item('U_ConMSCFi').Value) = 'Y') then 
+            oTasaFija := true;
+
+      oCtoCosto := oDBDS.GetValue('U_ProfitCt', 0).Trim;
+      oRecordSet.DoQuery('Select isnull(cc.DimCode, 1) DimCode ' +
+                         '  from OPRC cc ' +
+                         ' where cc.PrcCode = ' + TMultiFunctions.Quotedstr(oCtoCosto));
+      if (not oRecordSet.EoF) then
+         oDimension := System.Int32(oRecordSet.Fields.Item('DimCode').Value)
+      else 
+         oDimension := 0;
+
+      Fecha       := FSBOf.StrToDate(EditText(oForm.Items.Item('BajaFec').Specific).Value);
+      oPerIngreso := FSBOf.StrToInteger(oDBDS.GetValue('U_InitPer'  , 0));
+      oYrIngreso  := FSBOf.StrToInteger(oDBDS.GetValue('U_InitYear' , 0));
+
+      if (Repomo) then begin
+         if (oPer = 1) then begin
+            oYr  := oYr - 1;
+            oPer := 12;
+         end
+         else
+            oPer := oPer - 1;
+
+         if ((oPer = oPerIngreso) and (oYr = oYrIngreso)) or (oYr < oYrIngreso) or ((oPer < oPerIngreso) and (oYr = oYrIngreso)) then begin
+         end
+         else begin
+            sql := 'Select d.U_CorrActi, d.U_CorrDepr, d.U_Deprecia ' +
+                   '  from [@vid_afac] d inner join [@vid_afas] h on d.code = h.code ' +
+                   ' where h.u_actcode = ' + TMultiFunctions.Quotedstr(oDBDS.GetValue('U_ActCode', 0).Trim) +
+                   '   and d.U_Year    = ' + TMultiFunctions.inttostr(oYr) +
+                   '   and d.U_Periodo = ' + TMultiFunctions.inttostr(oPer);
+            oRecordSet.DoQuery(sql);
+            if (oRecordSet.EoF) then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Info_incompleta_en_baja]);
+         end;
+
+         oFactor := 0;
+
+         oValAct  := FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC' , 0));
+         oValDepA := FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu' , 0));
+         oValAct  := AjustarDecimalesSUM(oValAct);
+         oValDepA := AjustarDecimalesSUM(oValDepA);
+         oValDe   := oValAct - oValDepA;
+
+         if (oTasaFija) then begin
+            oValActSys  := (FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC' , 0))) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValDepASys := (FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) + FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu' , 0))) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValActSys  := AjustarDecimalesSUM(oValActSys);
+            oValDepASys := AjustarDecimalesSUM(oValDepASys);
+            oValDeSys   := oValActSys - oValDepASys;
+         end;
+
+         oJEntries.ReferenceDate := Fecha;
+         oJEntries.TaxDate       := Fecha;
+         oJEntries.DueDate       := Fecha;
+         oJEntries.Reference     := 'RAF-Baja';
+         oJEntries.Reference2    := oDBDS.GetValue('U_ActCode', 0).Trim;
+         oJEntries.TransactionCode := '';
+         oJEntries.ProjectCode     := oDBDS.GetValue('U_Project', 0).Trim;
+
+         lin := 0;
+
+            // U_Deprecia
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaDepAc', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValDepA > 0) then
+               oJEntries.Lines.Credit := oValDepA
+            else
+               oJEntries.Lines.Debit  := oValDepA * (-1);
+            if (oTasaFija) then begin
+               if (oValDepASys > 0) then
+                  oJEntries.Lines.CreditSys := oValDepASys
+               else
+                  oJEntries.Lines.DebitSys  := oValDepASys * (-1);
+            end;
+            inc(lin);
+
+            // U_Venta
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaAdqAc', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValAct > 0) then
+               oJEntries.Lines.Debit := oValAct
+            else
+               oJEntries.Lines.Credit  := (oValAct) * (-1);
+            if (oTasaFija) then begin
+               if (oValActSys > 0) then
+                  oJEntries.Lines.DebitSys  := oValActSys
+               else
+                  oJEntries.Lines.CreditSys := oValActSys * (-1);
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaGasBj', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValDe > 0) then
+               oJEntries.Lines.Credit := oValDe
+            else
+               oJEntries.Lines.Debit  := oValDe * (-1);
+            if (oTasaFija) then begin
+               if (oValDeSys > 0) then
+                  oJEntries.Lines.CreditSys := oValDeSys
+               else
+                  oJEntries.Lines.DebitSys  := oValDeSys * (-1);
+            end;
+      end
+      else begin
+         sql := 'Select d.U_CorrActi, d.U_CorrDepr, d.U_Deprecia ' +
+                '  from [@vid_afac] d inner join [@vid_afas] h on d.code = h.code ' +
+                ' where h.u_actcode = ' + TMultiFunctions.Quotedstr(oDBDS.GetValue('U_ActCode', 0).Trim) +
+                '   and d.U_Year    = ' + TMultiFunctions.inttostr(oYr) +
+                '   and d.U_Periodo = ' + TMultiFunctions.inttostr(oPer);
+         oRecordSet.DoQuery(sql);
+         if (oRecordSet.EoF) then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Info_incompleta_en_baja]);
+
+         oFactor := 1.0 - double(Fecha.Day)/Fecha.DaysInMonth(Fecha.Year, Fecha.Month);
+
+         oValCA  := System.Double(oRecordSet.Fields.Item('U_CorrActi').Value) * oFactor;
+         oValCD  := System.Double(oRecordSet.Fields.Item('U_CorrDepr').Value) * oFactor;
+         oValCA  := AjustarDecimalesSUM(oValCA);
+         oValCD  := AjustarDecimalesSUM(oValCD);
+         if (CorrPos) then begin
+            if (oValCA < 0) then
+               oValCA := 0; 
+            if (oValCD < 0) then
+               oValCD := 0; 
+         end;
+
+         oValDe  := System.Double(oRecordSet.Fields.Item('U_Deprecia').Value) * oFactor;
+         oValDe  := AjustarDecimalesSUM(oValDe);
+         oValAct := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'   , 0))) + AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0))) +
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC' , 0))) -
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum'  , 0))) - AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0))) -
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu' , 0))) - oValCA + oValCD + oValDe;
+         oValActF := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0))) + AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0))) +
+                     AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC', 0))) - oValCA;
+         oValDepA := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0))) + AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0))) +
+                    AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu' , 0))) - oValCD - oValDe;
+
+         if (oTasaFija) then begin
+            oValCASys  := System.Double(oRecordSet.Fields.Item('U_CorrActi').Value) * oFactor / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValCDSys  := System.Double(oRecordSet.Fields.Item('U_CorrDepr').Value) * oFactor / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValCASys  := AjustarDecimalesSUM(oValCASys);
+            oValCDSys  := AjustarDecimalesSUM(oValCDSys);
+            if (CorrPos) then begin
+               if (oValCASys < 0) then
+                  oValCASys := 0; 
+               if (oValCDSys < 0) then
+                  oValCDSys := 0; 
+            end;
+
+            oValDeSys  := System.Double(oRecordSet.Fields.Item('U_Deprecia').Value) * oFactor / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS'  , 0));
+            oValDeSys  := AjustarDecimalesSUM(oValDeSys);
+            oValActSys := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) + 
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) +
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) -
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - 
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) -
+                          AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - oValCASys + oValCDSys + oValDeSys;
+            oValActFSys := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CurVal'  , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) + 
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuAc', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) +
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_AdicAnuC', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - oValCASys;
+            oValDepASys := AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepAcum' , 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) + 
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_CorAnuDe', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) +
+                           AjustarDecimalesSUM(FSBOf.StrToDouble(oDBDS.GetValue('U_DepreAnu', 0)) / FSBOf.StrToDouble(oDBDS.GetValue('U_TasaCnMS', 0))) - oValCDSys - oValDeSys;
+         end;
+
+         oJEntries.ReferenceDate := Fecha;
+         oJEntries.TaxDate       := Fecha;
+         oJEntries.DueDate       := Fecha;
+         oJEntries.Reference     := 'RAF-Baja';
+         oJEntries.Reference2    := oDBDS.GetValue('U_ActCode', 0).Trim;
+         oJEntries.TransactionCode := '';
+         oJEntries.ProjectCode     := oDBDS.GetValue('U_Project', 0).Trim;
+
+         lin := 0;
+         // U_CorrActi
+         if (oValCA <> 0) then begin
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaActFi', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCA > 0) then
+               oJEntries.Lines.Debit   := oValCA
+            else
+               oJEntries.Lines.Credit  := oValCA * (-1);
+            if (oTasaFija) then begin
+               if (oValCASys > 0) then
+                  oJEntries.Lines.DebitSys  := oValCASys
+               else
+                  oJEntries.Lines.CreditSys := oValCASys * (-1);
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaCorAF', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCA > 0) then
+               oJEntries.Lines.Credit := oValCA
+            else
+               oJEntries.Lines.Debit  := oValCA * (-1);
+            if (oTasaFija) then begin
+               if (oValCASys > 0) then
+                  oJEntries.Lines.CreditSys := oValCASys
+               else
+                  oJEntries.Lines.DebitSys  := oValCASys * (-1);
+            end;
+            inc(lin);
+         end;
+
+            // U_CorrDepr
+         if (oValCD <> 0) then begin
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaDepAc', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCD > 0) then
+               oJEntries.Lines.Credit := oValCD
+            else
+               oJEntries.Lines.Debit  := oValCD * (-1);
+            if (oTasaFija) then begin
+               if (oValCDSys > 0) then
+                  oJEntries.Lines.CreditSys := oValCDSys
+               else
+                  oJEntries.Lines.DebitSys  := oValCDSys * (-1);
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaCorDA', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValCD > 0) then
+               oJEntries.Lines.Debit := oValCD
+            else
+               oJEntries.Lines.Credit  := oValCD * (-1);
+            if (oTasaFija) then begin
+               if (oValCDSys > 0) then
+                  oJEntries.Lines.DebitSys  := oValCDSys
+               else
+                  oJEntries.Lines.CreditSys := oValCDSys * (-1);
+            end;
+            inc(lin);
+         end;
+
+            // U_Deprecia
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaDepAc', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (RevBaja) then begin
+               if (oValDepA > 0) then
+                  oJEntries.Lines.Credit := oValDepA
+               else
+                  oJEntries.Lines.Debit  := oValDepA * (-1);
+               if (oTasaFija) then begin
+                  if (oValDepASys > 0) then
+                     oJEntries.Lines.CreditSys := oValDepASys
+                  else
+                     oJEntries.Lines.DebitSys  := oValDepASys * (-1);
+               end;
+            end
+            else begin
+               if (oValDe > 0) then
+                  oJEntries.Lines.Credit := oValDe
+               else
+                  oJEntries.Lines.Debit  := oValDe * (-1);
+               if (oTasaFija) then begin
+                  if (oValDeSys > 0) then
+                     oJEntries.Lines.CreditSys := oValDeSys
+                  else
+                     oJEntries.Lines.DebitSys  := oValDeSys * (-1);
+               end;
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaGasDe', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValDe > 0) then
+               oJEntries.Lines.Debit := oValDe
+            else
+               oJEntries.Lines.Credit  := oValDe * (-1);
+            if (oTasaFija) then begin
+               if (oValDeSys > 0) then
+                  oJEntries.Lines.DebitSys  := oValDeSys
+               else
+                  oJEntries.Lines.CreditSys := oValDeSys * (-1);
+            end;
+            inc(lin);
+
+            // U_Venta
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('U_CtaActFi', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (RevBaja) then begin
+               if (oValActF-oValDe > 0) then
+                  oJEntries.Lines.Debit := oValActF-oValDe
+               else
+                  oJEntries.Lines.Credit  := (oValActF-oValDe) * (-1);
+               if (oTasaFija) then begin
+                  if (oValActFSys-oValDeSys > 0) then
+                     oJEntries.Lines.DebitSys  := oValActFSys-oValDeSys
+                  else
+                     oJEntries.Lines.CreditSys := (oValActFSys-oValDeSys) * (-1);
+               end;
+            end
+            else begin
+               if (oValAct > 0) then
+                  oJEntries.Lines.Debit := oValAct
+               else
+                  oJEntries.Lines.Credit  := oValAct * (-1);
+               if (oTasaFija) then begin
+                  if (oValActSys > 0) then
+                     oJEntries.Lines.DebitSys  := oValActSys
+                  else
+                     oJEntries.Lines.CreditSys := oValActSys * (-1);
+               end;
+            end;
+            inc(lin);
+
+            if (lin > 0) then
+               oJEntries.lines.Add;
+            oJEntries.Lines.SetCurrentLine(lin);
+            oJEntries.Lines.AccountCode := oDBDS.GetValue('u_CtaGasBj', 0).Trim;
+            oJEntries.Lines.ProjectCode := oDBDS.GetValue('U_Project' , 0).Trim;
+            case oDimension of
+              1 : oJEntries.Lines.CostingCode  := oCtoCosto;
+              2 : oJEntries.Lines.CostingCode2 := oCtoCosto;
+              3 : oJEntries.Lines.CostingCode3 := oCtoCosto;
+              4 : oJEntries.Lines.CostingCode4 := oCtoCosto;
+              5 : oJEntries.Lines.CostingCode5 := oCtoCosto;
+            end; // case
+            if (oValAct > 0) then
+               oJEntries.Lines.Credit := oValAct
+            else
+               oJEntries.Lines.Debit  := oValAct * (-1);
+            if (oTasaFija) then begin
+               if (oValActSys > 0) then
+                  oJEntries.Lines.CreditSys := oValActSys
+               else
+                  oJEntries.Lines.DebitSys  := oValActSys * (-1);
+            end;
+      end;
+
+      try
+         oActivos := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFAS'));
+
+         oActivosParameter := SAPbobsCOM.GeneralDataParams(oActivos.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+         oRecordSet.DoQuery('Select Code from [@VID_AFAS] where U_ActCode = ' + TMultiFunctions.Quotedstr(EditText(oForm.Items.Item('ActCode').Specific).Value) );
+         s := System.string(oRecordSet.Fields.Item('Code').Value);
+         oActivosParameter.SetProperty('Code', s);
+
+         oActivosData := oActivos.GetByParams(oActivosParameter);
+
+         s      := 'N';
+         oValde := 0;
+         oActivosData.SetProperty('U_DeBaja' , s);
+         oActivosData.SetProperty('U_ValBaja', oValDe);
+         oActivosData.SetProperty('U_BajaFec', FSBOf.StrToDate(EditText(oForm.Items.Item('BajaFec').Specific).Value));
+
+         FSBOf.Cmpny.StartTransaction;
+         errCode := oJEntries.Add;
+         if (errCode <> 0) then begin
+            FCmpny.GetLastError(out errCode, out errMsg);
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Error_anular_baja] + TMultiFunctions.inttostr(errCode) + ' - ' + errMsg);
+         end;
+
+         oActivos.Update(oActivosData);
+
+         FSBOf.Cmpny.EndTransaction(BoWfTransOpt.wf_Commit);
+         result := true;
+
+         FSBOApp.StatusBar.SetText(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Baja_activo] +
+                                   EditText(oForm.Items.Item('ActCode').Specific).Value +   
+                                   GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Anulada_baja], 
+                                   BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success);
+      except
+         on e: exception do begin
+            if (FSBOf.Cmpny.InTransaction) then
+               FSBOf.Cmpny.EndTransaction(BoWfTransOpt.wf_RollBack);
+            FSBOApp.StatusBar.SetText(e.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+            OutLog('Anular baja: ' + e.Message + '  ** Trace: ' + e.StackTrace);
+         end;
+      end;
+   finally
+      FSBOf._ReleaseCOMObject(oJEntries);
+   end;
+end;
+
+method TDarDeBaja.AjustarDecimalesSUM(Valor: double): double;
+begin
+   result := Math.Round(Valor, GlobalSettings.LocalCurr_Dec, MidpointRounding.AwayFromZero );
+end;
+
+end.

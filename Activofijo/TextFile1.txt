@@ -1,0 +1,3471 @@
+namespace AF_IFRS.ProcesoAF;
+
+interface
+
+uses
+  SAPbouiCOM, 
+  SAPbobsCOM, 
+  System.Collections.Generic,
+  System.Runtime.InteropServices,
+  System.Diagnostics,
+  VisualD.GlobalVid,
+  VisualD.SBOFunctions, 
+  VisualD.vkBaseForm, 
+  VisualD.SBOGeneralService,
+  VisualD.vkFormInterface,
+  Visuald.MultiFunctions;
+
+type
+  TActividaMensual = class
+      Year      : integer;
+      Per       : integer;
+      CorrAct   : double;
+      CorrDep   : double;
+      DeprMes   : double;
+      DeprNoAct : double;
+      CorDepM   : double;
+      AdicVal   : double;
+      AdicVid   : integer;
+      PerDepre  : integer;
+  end;
+
+  TActivoAdicion = class
+      PeriodoInicial       : Integer;
+      PeriodosDerpreciados : Integer;
+      ValorInicialActivo   : Double;    // Tambien representa una adicion
+      ValorInicialDeprec   : Double;
+      ValorCorregidoActivo : Double;
+      ValorCorregidoDeprec : Double;
+      VidaUtil             : Integer;
+      AdicVida             : Integer;
+  end;
+
+  TIndice = array [0..12] of double;
+
+  TProcesoAF = class(TvkBaseForm, IvkFormInterface)
+  private
+    { Private Declarations }
+    Lista:      List<String>;
+    ListaMx:    List<String>;
+    oFactDec:   integer;
+    oRndDec:    boolean;
+    oLogMess:   Boolean := false;
+    oLogCode:   String  := '18';
+
+//    [DllImport("kernel32.dll")]
+//    class method SetProcessWorkingSetSize(handle: IntPtr; min: integer; max: integer):Boolean; external;
+    
+
+    method   GetIndice(oRecordAux1: SAPbobsCOM.Recordset; sIndice, sYear, sMonth: string; MarcaError: boolean): double;
+    method   PeriodoAbierto(yr, mn: integer): boolean;
+    method   ObtenerNxtYearNxtPeriod(vYear, vPeriod: integer; var nxYr, nxPr, IniYr, IniPr: integer);
+    method   InitActivoAdicion(var a: TActivoAdicion);
+
+    method    ProcesarActivos(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+    method    ReversarProcesoActivos(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+    method    Centralizar(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+    method    ReversarCentralizacion(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+    method    AjustarDecimales(Valor: double): double;
+    method    AjustarDecimalesSUM(Valor: double): double;
+    method    ActualizarRevalIFRS();
+    method    ActualizarVentaIFRS();
+
+    method    ContabilizarEnSBOCrearAsiento(var oJE: SAPbobsCOM.JournalEntries; Year, Period, Day: Integer; ref, ref2, Project, TranCode, Memo: String);
+    method    ContabilizarEnSBOInsertarValor(var oJE: SAPbobsCOM.JournalEntries; oValor: Double; CtoCosto, CtaDebit, CtaCredit: String);
+    method    ContabilizarEnSBOCerrarAsiento(var oJE: SAPbobsCOM.JournalEntries);
+    method    ProcesoFinanciero(var oActivosData, oParametrosData, oActivosLinesData: SAPbobsCOM.GeneralData; var oActivosLines: SAPbobsCOM.GeneralDataCollection; var oRecordActividad: SAPbobsCOM.RecordSet; Indices: TIndice; nxYr, nxPr: integer; var TopeLey33Bis: Double);
+    method    ProcesoReferencial(var oActivosData, oParametrosData, oActivosLinesData: SAPbobsCOM.GeneralData; var oActivosLines: SAPbobsCOM.GeneralDataCollection; var oRecordActividad: SAPbobsCOM.RecordSet; Indices: TIndice; nxYr, nxPr: integer; var TopeLey33Bis: Double);
+    method    ProcesoIFRS(var oActivosData, oParametrosData, oActivosLinesData: SAPbobsCOM.GeneralData; var oActivosLines: SAPbobsCOM.GeneralDataCollection; var oRecordActividad: SAPbobsCOM.RecordSet; nxYr, nxPr: integer; U_NewVidaUtil : Integer; U_NewVal : Double);
+    method    ReversarProcesoFinanciero(var oActivosData, oParametrosData: SAPbobsCOM.GeneralData; vyear, vperiod : integer);
+    method    ReversarProcesoReferencial(var oActivosData, oParametrosData: SAPbobsCOM.GeneralData; vyear, vperiod : integer);
+    method    ReversarProcesoIFRS(var oActivosData, oParametrosData: SAPbobsCOM.GeneralData; vyear, vperiod : integer);
+
+  public
+    method   InitForm(uid: string; xmlPath: string; var application:SAPbouiCOM.Application; var company:SAPbobsCOM.Company; var SBOFunctions: VisualD.SBOFunctions.CSBOFunctions ; var _GlobalSettings:TGlobalVid): boolean; reintroduce;
+    method   FormEvent(FormUID: string; var pVal: SAPbouiCOM.ItemEvent; var BubbleEvent: Boolean); reintroduce;
+ end;
+
+implementation
+
+uses
+  System.Globalization;
+
+method   TProcesoAF.InitForm(uid: string; xmlPath: string; var application:SAPbouiCOM.Application; var company:SAPbobsCOM.Company; var SBOFunctions: VisualD.SBOFunctions.CSBOFunctions ; var _GlobalSettings:TGlobalVid): boolean;
+var
+   oForm      : SAPbouiCOM.Form;
+   oRecordSet : SAPbobsCOM.Recordset;
+   i          : Integer;
+begin
+   Result := inherited InitForm(uid, xmlPath,var application,var company,var sboFunctions,var _GlobalSettings);
+   // inicializa variable locales
+   Lista   := new List<String>;
+   ListaMx := new List<String>;
+   try
+
+      if (FCmpny.language = BoSuppLangs.ln_English) then
+         FSBOf.LoadForm(xmlPath,'VID_ProcesoAF_EN.srf', Uid)
+      else
+         FSBOf.LoadForm(xmlPath,'VID_ProcesoAF.srf', Uid);
+
+      try
+         oForm := FSBOApp.Forms.Item(uid);
+         oForm.Freeze(True);
+         oForm.AutoManaged    := True;
+         oForm.SupportedModes := -1;             // afm_All
+         oForm.Mode           := SAPbouiCOM.BoFormMode.fm_OK_MODE;
+
+         oForm.DataSources.UserDataSources.Add('DSYear' ,SAPbouiCOM.BoDataType.dt_SHORT_NUMBER,4);
+         oForm.DataSources.UserDataSources.Add('DSPer'  ,SAPbouiCOM.BoDataType.dt_SHORT_NUMBER,3);
+         oForm.DataSources.UserDataSources.Add('DSGrupo',SAPbouiCOM.BoDataType.dt_SHORT_TEXT  ,8);
+         EditText(oForm.Items.Item('Year'  ).Specific).DataBind.SetBound(true,'','DSYear' );
+         EditText(oForm.Items.Item('Period').Specific).DataBind.SetBound(true,'','DSPer'  );
+         ComboBox(oForm.Items.Item('Grupo' ).Specific).DataBind.SetBound(true,'','DSGrupo');
+
+         oRecordSet      := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+
+         // Decimales de redondeo
+         oRecordSet.DoQuery('select Decimals from OCRN where CurrCode = ' + TMultiFunctions.QuotedStr(FCmpny.GetCompanyService.GetAdminInfo.LocalCurrency));
+         i := -1;
+         if (not oRecordSet.EoF) then 
+            i := System.Int32(oRecordSet.Fields.Item('Decimals').Value);
+         if (i = -1) then
+            GlobalSettings.LocalCurr_Dec := FCmpny.GetCompanyService.GetAdminInfo.TotalsAccuracy
+         else 
+            GlobalSettings.LocalCurr_Dec := i;
+
+         ComboBox(oForm.Items.Item('Grupo' ).Specific).ValidValues.Add('', GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Todos_los_activos]);
+         oRecordSet.DoQuery('Select Code, Name From [@VID_AFGR] order by Name');
+         oRecordSet.MoveFirst;
+         While (not oRecordSet.EoF) do begin
+            ComboBox(oForm.Items.Item('Grupo' ).Specific).ValidValues.Add(System.String(oRecordSet.Fields.Item('Code').Value), System.String(oRecordSet.Fields.Item('Name').Value));
+            oRecordSet.MoveNext;
+         end;
+
+         oRecordSet.DoQuery('SELECT isnull(U_FactDec,99) factdec, isnull(U_DecRound,''R'') decround  FROM [@VID_AFPA]');
+         oFactDec := System.int32(oRecordSet.Fields.Item('factdec').value);
+         if (oFactDec < 1) or (oFactDec > 9) then
+            oFactDec := 10;
+
+         oRndDec := true;
+         if (System.String(oRecordSet.Fields.Item('decround').value) = 'T') then
+           oRndDec := false;
+      finally
+         FSBOf._ReleaseCOMObject(oRecordSet);
+         oForm.Freeze(False);
+         oForm.Visible := true;
+      end;
+
+   except
+      on e:exception do begin
+         FSBOApp.MessageBox(e.Message,1,'Ok','','');
+         OutLog('InitForm: ' + e.Message);
+      end;
+   end;
+end;
+
+method   TProcesoAF.FormEvent(FormUID: string; var pVal: SAPbouiCOM.ItemEvent; var BubbleEvent: Boolean);
+var
+   oForm      : SAPbouiCOM.Form;
+   oProgBar   : SAPbouiCOM.ProgressBar;
+   nErr       : integer;
+   sErr       : string;
+begin
+   inherited FormEvent(FormUID, var pVal, var BubbleEvent);
+
+   oForm    := FSBOApp.Forms.Item(pVal.FormUID);
+
+   try
+      // Validacion valores
+      if (pVal.EventType = BoEventTypes.et_ITEM_PRESSED) and (pVal.BeforeAction = true) and
+         ( (pVal.ItemUID = 'Procesar') or (pVal.ItemUID = 'Contab') or (pVal.ItemUID = 'Reversar') ) then begin
+         BubbleEvent := False;
+         if (pVal.ItemUID = 'Procesar') then begin
+            if (1 = FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Procesar_Activos_QM], 1, 'Ok', 'Cancelar','')) then begin
+               try
+                  oProgBar := FSBOApp.StatusBar.CreateProgressBar(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Procesando], 100, false);
+                  BubbleEvent := false;
+                  if (not ProcesarActivos(oForm, oProgBar)) then
+                     ;
+                  BubbleEvent := true;
+                  FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Proceso_Done], 1, 'Ok', '','');
+               finally
+                  oProgBar.Stop;
+                  System.Runtime.InteropServices.Marshal.ReleaseComObject(oProgBar);
+                  oProgBar := nil;
+               end;
+            end;
+         end
+         else if (pVal.ItemUID = 'Contab') then begin
+            if (1 = FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Post_period_QM], 1, 'Ok', 'Cancelar','')) then begin
+               try
+                  oProgBar := FSBOApp.StatusBar.CreateProgressBar(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Procesando], 100, false);
+                  BubbleEvent := Centralizar(oForm, oProgBar);
+                  if (BubbleEvent) then
+                     FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Post_Done], 1, 'Ok', '','');
+               finally
+                  oProgBar.Stop;
+                  System.Runtime.InteropServices.Marshal.ReleaseComObject(oProgBar);
+                  oProgBar := nil;
+               end;
+            end;
+         end
+         else if (pVal.ItemUID = 'Reversar') then begin
+            if (1 = FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Reverse_Period_QM], 1, 'Ok', 'Cancelar','')) then begin
+               try
+                  oProgBar := FSBOApp.StatusBar.CreateProgressBar(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Procesando], 100, false);
+                  BubbleEvent := false;
+
+                  FCmpny.StartTransaction;
+                  if (not ReversarCentralizacion(oForm, oProgBar)) then
+                     exit;
+                  if (not ReversarProcesoActivos(oForm, oProgBar)) then
+                     exit;
+                  FCmpny.EndTransaction(BoWfTransOpt.wf_Commit);
+
+                  FSBOApp.MessageBox(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Reverse_Done], 1, 'Ok', '','');
+                  BubbleEvent := true;
+               finally
+                  oProgBar.Stop;
+                  System.Runtime.InteropServices.Marshal.ReleaseComObject(oProgBar);
+                  oProgBar := nil;
+               end;
+            end;
+         end;
+      end;
+
+      if (pVal.EventType = BoEventTypes.et_ITEM_PRESSED) and (pVal.BeforeAction = false) then begin
+         if (pVal.ItemUID = '1')then
+           oForm.Mode := BoFormMode.fm_OK_MODE;
+      end
+
+   except
+      on e: exception do begin
+         if (FCmpny.InTransaction) then
+            FCmpny.EndTransaction(BoWfTransOpt.wf_RollBack);
+         FCmpny.GetLastError(out nErr, out sErr);
+         FSBOApp.StatusBar.SetText(e.Message , BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+         OutLog('SBO: ' + TMultiFunctions.inttostr(nErr) + '  ' + sErr + 'SO: ' + e.Message + ' - ' + e.StackTrace);
+      end;
+   end;
+end;
+
+method TProcesoAF.AjustarDecimales(Valor: double): double;
+var
+   aux: double;
+begin
+   if (oRndDec) then
+      result := Math.Round(Valor, oFactDec, MidpointRounding.AwayFromZero )
+   else if (oFactDec >= 10) then
+      result := Valor
+   else begin
+      aux := Math.Pow(10.0, oFactDec);
+      result := Math.Truncate(Valor * aux);
+      result := result / aux;
+   end;
+end;
+
+method TProcesoAF.AjustarDecimalesSUM(Valor: double): double;
+begin
+   result := Math.Round(Valor, GlobalSettings.LocalCurr_Dec, MidpointRounding.AwayFromZero );
+end;
+
+method  TProcesoAF.PeriodoAbierto(yr, mn: integer): boolean;
+var
+   s: string;
+   oRecordSet: SAPbobsCOM.RecordSet;
+begin
+   result := false;
+   try
+      oRecordSet     := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+         // 2007 
+         s := 'SELECT count(*) cant from ofpr ' +
+              ' where month(f_refdate) <= ' + mn.ToString +
+              '   and year(f_refdate)   = ' + yr.ToString +
+              '   and month(t_refdate) >= ' + mn.ToString +
+              '   and year(t_refdate)   = ' + yr.ToString +
+              '   and PeriodStat <> ''Y'' ';
+
+      oRecordSet.DoQuery(s);
+      if (system.int32(oRecordSet.Fields.Item('cant').value) > 0) then
+         result := true;
+   finally
+      FSBOf._ReleaseCOMObject(oRecordSet);
+   end;
+end;
+
+method TProcesoAF.ObtenerNxtYearNxtPeriod(vYear, vPeriod: integer; var nxYr, nxPr, IniYr, IniPr: integer);
+begin
+   nxYr := vyear;
+   nxPr := vperiod + 1;
+   if (vperiod = 12) then begin
+     nxYr := vyear + 1;
+     nxPr := 1;
+   end;
+
+   IniYr := vyear;
+   IniPr := vperiod - 1;
+   if (vperiod = 1) then begin
+     IniYr := vyear - 1;
+     IniPr := 12;
+   end;
+end;
+
+method TProcesoAF.InitActivoAdicion(var a: TActivoAdicion);
+begin
+   a.PeriodoInicial := -1;
+   a.PeriodosDerpreciados := 0;
+   a.ValorInicialActivo   := 0;
+   a.ValorInicialDeprec   := 0;
+   a.ValorCorregidoActivo := 0;
+   a.ValorCorregidoDeprec := 0;
+   a.VidaUtil       := 0;
+   a.AdicVida       := 0;
+end;
+
+method TProcesoAF.ReversarProcesoActivos(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+var
+   vyear, vperiod : integer;
+   nxYr,  nxPr    : integer;
+   IniYr, IniPr   : integer;
+   s, w           : string;
+
+   oParametros          : SAPbobsCOM.GeneralService;
+   oParametrosData      : SAPbobsCOM.GeneralData;
+   oParametrosParameter : SAPbobsCOM.GeneralDataParams;
+
+   oActivos           : SAPbobsCOM.GeneralService;
+   oActivosData       : SAPbobsCOM.GeneralData;
+   oActivosParameter  : SAPbobsCOM.GeneralDataParams;
+
+   oRecordActivos     : SAPbobsCOM.RecordSet;
+   oRecordActividad   : SAPbobsCOM.RecordSet;
+   oProgBarVal        : integer;
+   oProgBarCont       : integer;
+begin
+   result := false;
+   try
+      oRecordActivos     := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+      oRecordActividad   := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+
+      vyear   := FSBOf.StrToInteger(EditText(oForm.Items.Item('Year').specific).Value);
+      vperiod := FSBOf.StrToInteger(EditText(oForm.Items.Item('Period').specific).Value);
+
+      ObtenerNxtYearNxtPeriod(vYear, vPeriod, var nxYr, var nxPr, var IniYr, var IniPr);
+
+      if (not PeriodoAbierto(vyear, vperiod) ) then
+         raise New Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Periodo_Cerrado]);
+         
+
+         // Traer parametros
+      oRecordActividad.DoQuery('Select Code from [@VID_AFPA] ');
+      if (oRecordActividad.EoF) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.NO_Parametros]);
+
+      s           := System.String(oRecordActividad.Fields.Item('Code').Value);
+      oParametros := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFPA'));
+      oParametrosParameter := SAPbobsCOM.GeneralDataParams(oParametros.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+      oParametrosParameter.SetProperty('Code', s);
+      oParametrosData := oParametros.GetByParams(oParametrosParameter);
+
+      s := 'Select code ' +
+           ' from [@VID_AFAC]' +
+           ' where ( u_year > ' + vyear.ToString + ' or ' +
+           '         ( u_year = ' + vyear.ToString + ' and u_Periodo  > ' + vperiod.ToString + ' ) ) ' +
+           '   and u_year is not null ';
+
+      oRecordActividad.DoQuery(s);
+      oRecordActividad.MoveFirst;
+      if (not oRecordActividad.Eof) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Per_Post_Actividad]);
+
+      // Proceso por grupos de activos
+      w := '';
+      if (oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx <> '') then
+         w := " and a.U_ItmGrpCd = '" + oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx.Trim + "'";
+
+      // Reversa actividad - tablas locales
+      s := 'Select count(*) cant  ' +
+           ' from [@VID_AFAS] a ' +
+           ' where u_nextyear = ' + nxYr.ToString +
+           '   and u_nextper  = ' + nxPr.ToString +
+           w;
+      oRecordActivos.DoQuery(s);
+      oProgBarVal := System.Int32(oRecordActivos.Fields.Item('cant').Value);
+
+      s := "Select a.Code, a.U_ActCode, a.U_DeBaja,  isnull(U_ActTipo , 'N') U_ActTipo " +
+           ' from [@VID_AFAS] a inner join [@VID_AFAC] b on a.code = b.code and  ' +
+           '                                                b.U_Year    = case when a.u_nextper = 1 then a.u_nextyear - 1 else a.u_nextyear end and ' +
+           '                                                b.U_Periodo = case when a.u_nextper = 1 then 12 else a.u_nextper - 1 end ' +
+           ' where u_nextyear = ' + nxYr.ToString +
+           '   and u_nextper  = ' + nxPr.ToString + 
+           w +
+           ' UNION ' +
+           "Select a.Code, a.U_ActCode, a.U_DeBaja,  isnull(U_ActTipo , 'N') U_ActTipo " +
+           ' from [@VID_AFAS] a inner join [@VID_AFACR] b on a.code = b.code and  ' +
+           '                                                 b.U_Year    = case when a.u_nextper = 1 then a.u_nextyear - 1 else a.u_nextyear end and ' +
+           '                                                 b.U_Periodo = case when a.u_nextper = 1 then 12 else a.u_nextper - 1 end ' +
+           ' where u_nextyear = ' + nxYr.ToString +
+           '   and u_nextper  = ' + nxPr.ToString +
+           w;
+
+      oRecordActivos.DoQuery(s);
+      oRecordActivos.MoveFirst;
+      if (oRecordActivos.Eof) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Sin_activos]);
+
+
+      oActivos          := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFAS'));
+      oActivosParameter := SAPbobsCOM.GeneralDataParams(oActivos.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+      oProgBarCont      := 0;
+
+      While (not oRecordActivos.Eof) do begin
+
+         s := System.string(oRecordActivos.Fields.Item('Code').Value);
+         oActivosParameter.SetProperty('Code', s);
+         oActivosData := oActivos.GetByParams(oActivosParameter);
+
+         inc(oProgBarCont);
+         var d1 : Double := oProgBarCont*100/oProgBarVal;
+         oProgBar.Value := Convert.ToInt32(Math.Round(d1));
+         oProgBar.text  := System.String(oRecordActivos.Fields.Item('U_ActCode').value);
+
+         // Si ha sido dado de baja se mantine historia
+         if (System.String(oRecordActivos.Fields.Item('U_DeBaja').value) = 'Y') then 
+             raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Activos_en_baja_reversar]);
+
+         s := System.string(oRecordActivos.Fields.Item('U_ActTipo').Value);
+         if (not GlobalSettings.IFRSNativo) then begin
+            ReversarProcesoFinanciero(var oActivosData, var oParametrosData, vyear, vperiod);
+            ReversarProcesoReferencial(var oActivosData, var oParametrosData, vyear, vperiod);
+         end
+         else if (s = 'N') then begin
+            ReversarProcesoIFRS(var oActivosData, var oParametrosData, vyear, vperiod);
+            ReversarProcesoReferencial(var oActivosData, var oParametrosData, vyear, vperiod);
+         end
+         else if (s = 'I') then 
+            ReversarProcesoIFRS(var oActivosData, var oParametrosData, vyear, vperiod)
+         else if (s = 'T') then 
+            ReversarProcesoReferencial(var oActivosData, var oParametrosData, vyear, vperiod)
+         else
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Activo_No_Clasificado]);
+
+         oActivosData.SetProperty('U_NextYear',  vyear   );
+         oActivosData.SetProperty('U_NextPer' ,  vperiod );
+
+         oActivos.Update(oActivosData);
+
+         oRecordActivos.MoveNext;
+      end;
+
+      oProgBar.Value := 100;
+      result := true;
+   finally
+      FSBOf._ReleaseCOMObject(oRecordActivos     );
+      FSBOf._ReleaseCOMObject(oRecordActividad   );
+   end;
+end;
+
+method  TProcesoAF.GetIndice(oRecordAux1: SAPbobsCOM.Recordset; sIndice, sYear, sMonth: string; MarcaError: boolean): double;
+var
+   s: string;
+begin
+      s := 'Select rate from ORTT '   +
+           '  where currency = '      + TMultiFunctions.QuotedStr(sIndice) +
+           '  and year(ratedate)  = ' + sYear +
+           '  and month(ratedate) = ' + sMonth ;
+      oRecordAux1.DoQuery(s);
+      if (oRecordAux1.Eof) and (MarcaError) then
+         raise new exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Indices_no_definidos] + sYear + '/' + sMonth)
+      else if (oRecordAux1.Eof) and (not MarcaError) then
+         result := 0
+      else
+         result  := System.Double( oRecordAux1.Fields.Item('rate').Value );
+end;
+
+method TProcesoAF.ProcesarActivos(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+var
+   TopeLey33BisR : double;
+   TopeLey33BisF : double;
+   UTM           : double;
+   Indices       : TIndice;
+
+   oActivos          : SAPbobsCOM.GeneralService;
+   oActivosData      : SAPbobsCOM.GeneralData;
+   oActivosParameter : SAPbobsCOM.GeneralDataParams;
+   oActivosLines     : SAPbobsCOM.GeneralDataCollection;
+   oActivosLinesData : SAPbobsCOM.GeneralData;
+
+   oParametros          : SAPbobsCOM.GeneralService;
+   oParametrosData      : SAPbobsCOM.GeneralData;
+   oParametrosParameter : SAPbobsCOM.GeneralDataParams;
+
+   s, w           : String;
+   nxYr   , nxPr  : Integer;
+   NewVal         : Double;
+   NewViUt        : Integer;
+   i              : Integer;
+
+   oRecordAux:            SAPbobsCOM.RecordSet;
+   oRecordIndices:        SAPbobsCOM.RecordSet;
+   oRecordActividad:      SAPbobsCOM.Recordset;
+   oRecordActivos:        SAPbobsCOM.RecordSet;
+   oRecordActividadDel:   SAPbobsCOM.RecordSet;
+   oProgBarVal          : integer;
+   oProgBarCont         : integer;
+begin
+   try
+      Result := false;
+
+      oRecordAux            := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+      oRecordIndices        := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+      oRecordActividad      := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+      oRecordActivos        := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+      oRecordActividadDel   := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+
+      // Traer parametros
+      oRecordAux.DoQuery('Select Code from [@VID_AFPA]');
+      if (oRecordAux.EoF) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.NO_Parametros]);
+      s := System.String(oRecordAux.Fields.Item('Code').Value);
+
+      oParametros := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFPA'));
+      oParametrosParameter := SAPbobsCOM.GeneralDataParams(oParametros.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+      oParametrosParameter.SetProperty('Code', s);
+      oParametrosData := oParametros.GetByParams(oParametrosParameter);
+
+      nxYr := FSBOf.StrToInteger(EditText(oForm.Items.Item('Year'  ).specific).Value);
+      nxPr := FSBOf.StrToInteger(EditText(oForm.Items.Item('Period').specific).Value);
+      if (nxYr = 0) or (nxPr = 0) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Periodo_invalido]);
+
+      // buscar eror de activos sin actividad
+      s := 'Select U_ActCode  ' +
+           ' from [@VID_AFAS] ' +
+           ' where ( u_nextyear < ' + nxYr.ToString + ' or ' +
+           '       ( u_nextyear = ' + nxYr.ToString + ' and u_nextper  < ' + nxPr.ToString + ' ) ) ' +
+           '   and isnull(u_debaja,''N'')  <> ''Y'' ' +
+           '   and (U_pervidaR > u_pRrdepre or u_pervidau > u_perdepre) ';
+      oRecordActividad.DoQuery(s);
+      if (not oRecordActividad.Eof) then 
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Activo_sin_Actividad_posterior] +
+                                System.String(oRecordActividad.Fields.Item('U_ActCode').value));
+
+      // buscar error de adiciones sin procesar
+      s := 'Select d.U_Adicion  ' +
+           ' from [@VID_AFAD] d inner join [@VID_AFAS] a on a.code = d.code' +
+           ' where ( d.u_year < ' + nxYr.ToString + ' or ' +
+           '       ( d.u_year = ' + nxYr.ToString + ' and d.u_periodo  < ' + nxPr.ToString + ' ) ) ' +
+           '   and ( d.u_year    <> a.u_inityear) ' +
+           '   and ( d.u_periodo <> a.u_initper) ' +
+           '   and isnull(d.u_Procesad,''N'')  <> ''Y'' ' ;
+      oRecordActividad.DoQuery(s);
+      if (not oRecordActividad.Eof) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Adicion_sin_Actividad_posterior] +
+                                System.String(oRecordActividad.Fields.Item('U_Adicion').value));
+
+
+      // buscar error de activos con actividad ya procesada para el periodo
+//      s := 'SELECT a.U_ActCode ' +
+//           '  FROM [@VID_AFAC] d inner join [@VID_AFAS] a on a.code = d.code' +
+//           ' Where d.u_year    = ' +  nxYr.ToString +
+//           '   AND d.u_periodo = ' +  nxPr.ToString ;
+//      oRecordActividad.DoQuery(s);
+//      if (not oRecordActividad.Eof) then
+//         raise new Exception('Activo con actividad para periodo: ' +  System.String(oRecordActividad.Fields.Item('U_ActCode').value));
+
+      // obtener los posibles indices a utilizar
+      Indices[0]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), TMultiFunctions.inttostr(nxYr-1), '12', false);
+      Indices[1]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '1', false);
+      Indices[2]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '2', false);
+      Indices[3]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '3', false);
+      Indices[4]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '4', false);
+      Indices[5]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '5', false);
+      Indices[6]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '6', false);
+      Indices[7]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '7', false);
+      Indices[8]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '8', false);
+      Indices[9]   := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , '9', false);
+      Indices[10]  := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  ,'10', false);
+      Indices[11]  := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  ,'11', false);
+      Indices[12]  := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  ,'12', false);
+      indices[nxPr]:= GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_IPCInd')), nxYr.ToString  , nxPr.ToString, true);
+
+      // Indice UTM recuperado para Ley Bis33.
+      UTM           := 0.0;
+      TopeLey33BisF := 0.0;
+      TopeLey33BisR := 0.0;
+      if (System.String(oParametrosData.GetProperty('U_Bis33Flg')) = 'Y') then
+         UTM := GetIndice(oRecordIndices, System.String(oParametrosData.GetProperty('U_Bis33Ind')), nxYr.ToString, nxPr.ToString, true);
+      if (System.String(oParametrosData.GetProperty('U_Bis33Fin')) = 'Y') then
+         TopeLey33BisF := System.Double( oParametrosData.GetProperty('U_Bis33Top')) * UTM;
+      if (System.String(oParametrosData.GetProperty('U_Bis33Ref')) = 'Y') then
+         TopeLey33BisR := System.Double( oParametrosData.GetProperty('U_Bis33Top')) * UTM;
+
+      // Borra lineas sin informacion
+      s := 'delete from [@VID_AFAC] where u_year is null  ';
+      oRecordActividadDel.DoQuery(s);
+
+      s := 'delete from [@VID_AFACR] where u_year is null ';
+      oRecordActividadDel.DoQuery(s);
+
+      s := 'delete from [@VID_AFSA] where u_year is null  ';
+      oRecordActividadDel.DoQuery(s);
+
+      s := 'delete from [@VID_AFSAR] where u_year is null  ';
+      oRecordActividadDel.DoQuery(s);
+
+      // Proceso por grupos de activos
+      w := '';
+      if (oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx <> '') then
+         w := " and a.U_ItmGrpCd = '" + oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx.Trim + "'";
+
+      s := 'Select count(*) cant ' +
+           ' from [@VID_AFAS] a  ' +
+           ' where u_nextyear = ' + nxYr.ToString +
+           '   and u_nextper  = ' + nxPr.ToString +
+           w +
+           '   and isnull(u_debaja,''N'')  <> ''Y'' '  ;
+      oRecordActivos.DoQuery(s);
+      oProgBarVal := System.Int32(oRecordActivos.Fields.Item('cant').Value);
+
+      s := 'Select a.U_ActCode , a.Code , a.U_ActTipo, ' +
+           '       isnull(r.U_NewVal, 0) U_NewVal,  isnull(r.U_PerPorDp, 0) U_NewVidaUtil ' +
+ 
+           ' from [@VID_AFAS] a left outer join (Select h.U_Year, h.U_Periodo, d.U_ActCode, d.U_NewVal, d.U_PerPorDp ' +
+           '                                       from [@VID_AFREV] h inner join [@VID_AFREVD] d on h.DocEntry = d.DocEntry) r ' +
+           '                    on a.U_NextYear = r.U_Year and a.U_NextPer = r.U_Periodo and a.U_ActCode = r.U_ActCode   ' +
+
+           ' where a.u_nextyear = ' + nxYr.ToString +
+           '   and a.u_nextper  = ' + nxPr.ToString +
+           w +
+           '   and isnull(a.u_debaja,''N'')  <> ''Y'' ' +
+           ' order by U_InDate ' ;
+      oRecordActivos.DoQuery(s);
+      if (oRecordActivos.Eof) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Sin_activo_a_procesar]);
+
+      oProgBarCont      := 0;
+
+            oActivos          := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFAS'));
+            oActivosParameter := SAPbobsCOM.GeneralDataParams(oActivos.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+      i := 1;
+      While (not oRecordActivos.Eof) do begin
+            FCmpny.StartTransaction;
+
+            s := System.string(oRecordActivos.Fields.Item('Code').Value);
+            oActivosParameter.SetProperty('Code', s);
+            oActivosData := oActivos.GetByParams(oActivosParameter);
+       
+            NewVal  := System.Double(oRecordActivos.Fields.Item('U_NewVal').Value);
+            NewViUt := System.Int32(oRecordActivos.Fields.Item('U_NewVidaUtil').Value);
+
+            inc(oProgBarCont);
+            var d1 : Double := oProgBarCont*100/oProgBarVal;
+            oProgBar.Value := Convert.ToInt32(Math.Round(d1));
+            oProgBar.text  := System.String(oActivosData.GetProperty('U_ActCode'));
+        
+            s := System.string(oRecordActivos.Fields.Item('U_ActTipo').Value);
+            if (not GlobalSettings.IFRSNativo) then begin
+               ProcesoFinanciero(var oActivosData, var oParametrosData, var oActivosLinesData, var oActivosLines, var oRecordAux, Indices, nxYr, nxPr, var TopeLey33BisF);
+               ProcesoReferencial(var oActivosData, var oParametrosData, var oActivosLinesData, var oActivosLines, var oRecordAux, Indices, nxYr, nxPr, var TopeLey33BisR);
+            end
+            else if (s = 'N') then begin
+               ProcesoIFRS(var oActivosData, var oParametrosData, var oActivosLinesData, var oActivosLines, var oRecordAux, nxYr, nxPr, NewViUt, NewVal);
+               ProcesoReferencial(var oActivosData, var oParametrosData, var oActivosLinesData, var oActivosLines, var oRecordAux, Indices, nxYr, nxPr, var TopeLey33BisR);
+            end
+            else if (s = 'I') then 
+               ProcesoIFRS(var oActivosData, var oParametrosData, var oActivosLinesData, var oActivosLines, var oRecordAux, nxYr, nxPr, NewViUt, NewVal)
+            else if (s = 'T') then 
+               ProcesoReferencial(var oActivosData, var oParametrosData, var oActivosLinesData, var oActivosLines, var oRecordAux, Indices, nxYr, nxPr, var TopeLey33BisR)
+            else
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Activo_No_Clasificado]);
+        
+            // oActivosData.ToXMLFile(FSBOf.oLog.LogFile + 'Activo_procesado.xml');
+            oActivos.Update(oActivosData);
+            FCmpny.EndTransaction(BoWfTransOpt.wf_Commit);
+                
+         if (i mod 100 = 0) then begin
+            if (oActivosParameter <> nil) then
+               System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosParameter);
+            if (oActivos <> nil) then
+               System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivos);
+            if (oActivosData <> nil) then
+               System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosData);
+            if (oActivosLinesData <> nil) then
+               System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosLinesData);
+            if (oActivosLines <> nil) then
+               System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosLines);
+            oActivosParameter := nil; 
+            oActivos          := nil; 
+            oActivosData      := nil; 
+            oActivosLinesData := nil;
+            oActivosLines     := nil;
+
+            oActivos          := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFAS'));
+            oActivosParameter := SAPbobsCOM.GeneralDataParams(oActivos.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+            GC.Collect();
+
+            // Nuevo para reducir memoria
+            GC.WaitForPendingFinalizers();
+
+         end;
+//         if (i mod 1000 = 0) then begin
+// Nuevo para reducir memoria
+//            if (Environment.OSVersion.Platform = PlatformID.Win32NT) then begin               
+//               SetProcessWorkingSetSize(process.GetCurrentProcess().Handle, -1, -1);
+//            end;
+//         end;
+
+         inc(i);
+         oRecordActivos.MoveNext;
+      end;
+      oProgBar.Value := 100;
+      Result := true;
+   finally
+      if (FCmpny.InTransaction) then
+         FCmpny.EndTransaction(BoWfTransOpt.wf_RollBack);
+      FSBOf._ReleaseCOMObject(oRecordAux         );
+      FSBOf._ReleaseCOMObject(oRecordIndices     );
+      FSBOf._ReleaseCOMObject(oRecordActivos     );
+      FSBOf._ReleaseCOMObject(oRecordActividad   );
+      FSBOf._ReleaseCOMObject(oRecordActividadDel);
+         if (oActivosParameter <> nil) then
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosParameter);
+         if (oActivos <> nil) then
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivos);
+         if (oActivosData <> nil) then
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosData);
+         if (oActivosLinesData <> nil) then
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosLinesData);
+         if (oActivosLines <> nil) then
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(oActivosLines);
+            oActivosParameter := nil; 
+            oActivos          := nil; 
+            oActivosData      := nil; 
+            oActivosLinesData := nil;
+            oActivosLines     := nil;
+//            FSBOf._ReleaseCOMObject(oActivosParameter);
+//            FSBOf._ReleaseCOMObject(oActivos);
+//            FSBOf._ReleaseCOMObject(oActivosData);
+            GC.Collect();
+   end;
+end;
+
+method TProcesoAF.Centralizar(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+var
+   vyear, vperiod : integer;
+   s, s1, w, w1   : string;
+   Bis33Fin       : Boolean;
+   Des_JoCorAct   : string;
+   Des_JoDepAct   : string;
+   Des_JoCorDep   : string;
+   errMsg         : string;
+   dia            : integer;
+
+   sCuentasCont   : String;
+   sOrderCtas     : String;
+   sGroupCtas     : String;
+
+   // Para contabilizar Bis33
+   lstCtaBis33    : List<String>;
+   lstCtaDepAc    : List<String>;
+   lstMtoBis33    : List<Double>; 
+   lstProfitCt    : List<String>; 
+   lstProject     : List<String>; 
+   TotBis33       : Double;
+   i, j, last_i   : Integer;
+
+   oParametros          : SAPbobsCOM.GeneralService;
+   oParametrosData      : SAPbobsCOM.GeneralData;
+   oParametrosParameter : SAPbobsCOM.GeneralDataParams;
+
+   oJEntries            : SAPbobsCOM.JournalEntries;
+   oRecordActivos      : SAPbobsCOM.RecordSet;
+   oRecordActividad    : SAPbobsCOM.RecordSet;
+   oRecordActividadUpd : SAPbobsCOM.RecordSet;
+   oProgBarVal         : integer;
+   oProgBarCont        : integer;
+   Repomo              : Boolean;
+begin
+   try
+      Result        := false;
+      oRecordActivos     := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+      oRecordActividad   := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+      oRecordActividadUpd:= RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+
+      vyear   := FSBOf.StrToInteger(EditText(oForm.Items.Item('Year').specific).Value);
+      vperiod := FSBOf.StrToInteger(EditText(oForm.Items.Item('Period').specific).Value);
+
+      if (not PeriodoAbierto(vyear, vperiod) ) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Periodo_Cerrado]);
+
+      // Traer parametros
+      oRecordActividad.DoQuery('Select Code, ' +
+                               '       (Select TrnsCodDsc from OTRC where TrnsCode = p.U_JoCorAct) Des_JoCorAct , ' +
+                               '       (Select TrnsCodDsc from OTRC where TrnsCode = p.U_JoDepAct) Des_JoDepAct , ' +
+                               '       (Select TrnsCodDsc from OTRC where TrnsCode = p.U_JoCorDep) Des_JoCorDep   ' +
+                               ' from [@VID_AFPA] p ');
+      if (oRecordActividad.EoF) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.NO_Parametros]);
+      Des_JoCorAct := System.String(oRecordActividad.Fields.Item('Des_JoCorAct').Value);
+      Des_JoDepAct := System.String(oRecordActividad.Fields.Item('Des_JoDepAct').Value);
+      Des_JoCorDep := System.String(oRecordActividad.Fields.Item('Des_JoCorDep').Value);
+      s            := System.String(oRecordActividad.Fields.Item('Code').Value);
+
+
+      oParametros := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFPA'));
+      oParametrosParameter := SAPbobsCOM.GeneralDataParams(oParametros.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+      oParametrosParameter.SetProperty('Code', s);
+      oParametrosData := oParametros.GetByParams(oParametrosParameter);
+
+      // Actividad
+      s := "Select code " +
+           " from [@VID_AFAC] " +
+           " where ( u_year < " + vyear.ToString + " or " +
+           "         ( u_year = " + vyear.ToString + " and u_Periodo  < " + vperiod.ToString + " ) ) " +
+           "   and u_year is not null " +
+           "   and u_postflag = 'N' ";
+      oRecordActividad.DoQuery(s);
+      oRecordActividad.MoveFirst;
+      if (not oRecordActividad.Eof) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Periodo_anterior_con_actividad]);
+
+      dia := system.Int32( oParametrosData.GetProperty('U_DiaConta') );
+      case vperiod of
+         2:               dia := Math.Min(dia, 28);
+         1,3,5,7,8,10,12: dia := Math.Min(dia, 31);
+         4,6,9,11:        dia := Math.Min(dia, 30);
+      end;
+
+      Repomo := false;
+      if (System.String(oParametrosData.GetProperty('U_Repomo')).Trim = 'Y') then
+         Repomo := true;
+
+      Bis33Fin := false; 
+      if (System.String(oParametrosData.GetProperty('U_Bis33Fin')) = 'Y') and (System.String(oParametrosData.GetProperty('U_Bis33Flg')) = 'Y') and (not GlobalSettings.IFRSNativo) then
+         Bis33Fin := true;
+
+      w1 := '';
+      if (Bis33Fin) then begin
+         sCuentasCont := ' a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde, a.u_ctabis33 ';
+         sOrderCtas   := ' order by a.U_Project, a.u_ctabis33, a.u_ctagasde ';
+         sGroupCtas   := ' a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde, a.u_ctabis33 ';
+
+         lstCtaBis33  := new List<String>;
+         lstCtaDepAc  := new List<String>;
+         lstMtoBis33  := new List<Double>; 
+         lstProfitCt  := new List<String>;
+         lstProject   := new List<String>;
+      end
+      else if (GlobalSettings.IFRSNativo) then begin
+         w1           := " and isnull(a.U_ActTipo , 'N') <> 'T' ";
+         // no se utilizan u_ctacoraf,  u_ctacorda
+         sCuentasCont := " a.u_ctaactfi,  a.u_ctadepac,  a.u_ctagasde, '' u_ctabis33 ";
+         sOrderCtas   := " ";
+         sGroupCtas   := " a.u_ctaactfi,  a.u_ctadepac,  a.u_ctagasde ";
+      end
+      else begin
+         sCuentasCont := " a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde, '' u_ctabis33 ";
+         sOrderCtas   := " ";
+         sGroupCtas   := " a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde ";
+      end;
+
+      // Proceso por grupos de activos
+      w := '';
+      if (oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx <> '') then
+         w := " and a.U_ItmGrpCd = '" + oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx.Trim + "'";
+
+      // la consulta de actividad es por item o por grupos de items
+      if (system.String( oParametrosData.GetProperty('U_ActbyLoc') ) = 'N') then begin
+         s := 'Select count(*) cant ' +
+              ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code        ' +
+              ' where b.u_year     = ' + vyear.ToString   +
+              '   and b.u_periodo  = ' + vperiod.ToString +
+              w + w1 +
+              '   and b.u_postflag = ''N'' ';
+         oRecordActivos.DoQuery(s);
+         oProgBarVal := System.Int32(oRecordActivos.Fields.Item('cant').Value);
+
+            s := 'Select a.U_ActCode ref, a.code, a.U_Project, a.U_ProfitCt,' +
+                 sCuentasCont + ',' +
+                 '       b.u_corracti, b.u_corrdepr, b.u_deprecia, b.u_corrdepm, b.u_deprnom, ' +
+                 '       z.Bis33, ' +
+                 '       case when a.u_pervidau - a.u_oriperdp = TotPerDepre and b.u_perdepre = 1 and b.u_pervidut = 0 then a.U_ValResid else 0 end + ' +
+                 '       case when a.u_pervidau - a.u_oriperdp - TotPerDepre + 1 = b.u_pervidut and b.u_pervidut > 1 then -1*a.U_ValResid else 0 end residual ' +
+
+                 ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code        ' +
+
+                 '                    inner join (select  code, sum(U_PerDepre) TotPerDepre ' +
+                 '                                  from [@vid_afac] ' +
+                 '                                 where (U_Year < ' + vyear.ToString + ') or (u_year = ' + vyear.ToString + ' and u_periodo <= ' + vperiod.ToString + ') ' +
+                 '                                 group by code ' +
+                 '                                ) Y on a.code = Y.code ' +
+
+                 '               left outer join (select code, sum(isnull(U_Bis33,0)) Bis33 ' +
+                 '                                  from [@VID_AFSA] sa ' +
+                 '                                  where U_Year = ' + vyear.ToString +
+                 '                                  group by code ' +
+                 '                                ) Z on a.Code = Z.Code ' +
+
+                 ' where b.u_year     = ' + vyear.ToString   +
+                 '   and b.u_periodo  = ' + vperiod.ToString +
+                 w + w1 +
+                 '   and b.u_postflag = ''N'' ' +
+                 sOrderCtas ;
+
+         errMsg := 'activo';
+      end
+      else begin
+         s := 'Select count(*) cant from ( ' +
+              'Select a.U_ItmGrpCd ref,  a.U_Project, a.U_ProfitCt,      ' +
+              sCuentasCont + ',' +
+              '       sum(b.u_corracti) u_corracti, sum(b.u_corrdepr) u_corrdepr, sum(b.u_deprecia) u_deprecia, sum(b.u_corrdepm) u_corrdepm, sum(b.u_deprnom) u_deprnom ' +
+              ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code ' +
+              ' where b.u_year     = ' + vyear.ToString   +
+              '   and b.u_periodo  = ' + vperiod.ToString +
+              w + w1 +
+              '   and b.u_postflag = ''N'' ' +
+              ' group by a.U_ItmGrpCd, a.U_Project, a.U_ProfitCt, ' + sGroupCtas +
+              ') T0 ';
+         oRecordActivos.DoQuery(s);
+         oProgBarVal := System.Int32(oRecordActivos.Fields.Item('cant').Value);
+
+            s := 'Select a.U_ItmGrpCd ref,  a.U_Project, a.U_ProfitCt, ' +
+                 sCuentasCont + ',' +
+                 '       sum(b.u_corracti) u_corracti, sum(b.u_corrdepr) u_corrdepr, sum(b.u_deprecia) u_deprecia, sum(b.u_corrdepm) u_corrdepm, sum(b.u_deprnom) u_deprnom, ' +
+                 '       sum(z.Bis33) Bis33, ' +
+                 '       sum(case when a.u_pervidau - a.u_oriperdp = TotPerDepre and b.u_perdepre = 1 and b.u_pervidut = 0 then a.U_ValResid else 0 end) + ' +
+                 '       sum(case when a.u_pervidau - a.u_oriperdp - TotPerDepre + 1 = b.u_pervidut and b.u_pervidut > 1 then -1*a.U_ValResid else 0 end) residual ' +
+
+                 ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code ' +
+
+                 '                    inner join (select  code, sum(U_PerDepre) TotPerDepre ' +
+                 '                                  from [@vid_afac] ' +
+                 '                                 where (U_Year < ' + vyear.ToString + ') or (u_year = ' + vyear.ToString + ' and u_periodo <= ' + vperiod.ToString + ') ' +
+                 '                                 group by code ' +
+                 '                                ) Y on a.code = Y.code ' +
+
+                 '               left outer join (select code, sum(isnull(U_Bis33,0)) Bis33 ' +
+                 '                                  from [@VID_AFSA] sa ' +
+                 '                                  where U_Year = ' + vyear.ToString +
+                 '                                  group by code ' +
+                 '                                ) Z on a.Code = Z.Code ' +
+
+                 ' where b.u_year     = ' + vyear.ToString   +
+                 '   and b.u_periodo  = ' + vperiod.ToString +
+                 w + w1 +
+                 '   and b.u_postflag = ''N'' ' +
+                 ' group by a.U_ItmGrpCd, a.U_Project, a.U_ProfitCt, ' + sGroupCtas +
+                 sOrderCtas;
+
+         errMsg := 'grupo';
+      end;
+      oRecordActivos.DoQuery(s);
+
+      oRecordActivos.MoveFirst;
+      if (oRecordActivos.Eof) then
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Sin_activos_a_contabilizar]);
+
+      oProgBarCont := 0;
+      FCmpny.StartTransaction;
+      while (not oRecordActivos.Eof) do begin
+         inc(oProgBarCont);
+         var d1 : Double := oProgBarCont*100/oProgBarVal;
+         oProgBar.Value := Convert.ToInt32(Math.Round(d1));
+         oProgBar.text  := System.String(oRecordActivos.Fields.Item('ref').value);
+
+         if (system.String( oRecordActivos.Fields.Item('u_ctaactfi').Value ) = '') then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_ActFij] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+         if (not GlobalSettings.IFRSNativo) then begin
+            if (system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ) = '') then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_CorrActFij] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+            if (system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ) = '') then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_CorrDepr] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+         end;
+         if (system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ) = '') then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_DepAcum] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+         if (system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ) = '') then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_GasDep] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+         if (system.String( oRecordActivos.Fields.Item('u_ctabis33').Value ) = '') and (Bis33Fin) then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_Bis33] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+
+         if (GlobalSettings.IFRSNativo) then begin
+               // depreciacion acumulada contra gastos de depreciacion
+               oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+           
+               ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'AF-',
+                                             system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                             system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                             system.String( oParametrosData.GetProperty('U_JoDepAct') ),
+                                             Des_JoDepAct );
+           
+               ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                              system.Double( oRecordActivos.Fields.Item('u_deprecia').Value ) - 
+                                              system.Double( oRecordActivos.Fields.Item('residual').Value )  , 
+                                              system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ) );
+           
+               ContabilizarEnSBOCerrarAsiento(var oJEntries);
+         end;
+
+         if (not GlobalSettings.IFRSNativo) then begin
+            // activo fijo contra correccion de activos (Repomo)
+            oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+ 
+            ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'AF-',
+                                          system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                          system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                          system.String( oParametrosData.GetProperty('U_JoCorAct') ),
+                                          Des_JoCorAct );
+
+            ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                           system.Double( oRecordActivos.Fields.Item('u_corracti').Value ), 
+                                           system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                           system.String( oRecordActivos.Fields.Item('u_ctaactfi').Value ),
+                                           system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ) );
+
+            ContabilizarEnSBOCerrarAsiento(var oJEntries);
+
+            if (not repomo) then begin
+               // depreciacion acumulada contra correccion de depreciacion
+               oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+           
+               ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'AF-',
+                                             system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                             system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                             system.String( oParametrosData.GetProperty('U_JoCorDep') ),
+                                             Des_JoCorDep );
+           
+               ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                              system.Double( oRecordActivos.Fields.Item('u_corrdepr').Value ), 
+                                              system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ) );
+           
+               ContabilizarEnSBOCerrarAsiento(var oJEntries);
+            end
+            else begin
+               // depreciacion acumulada contra correccion
+               oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+           
+               ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'AF-',
+                                             system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                             system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                             system.String( oParametrosData.GetProperty('U_JoCorDep') ),
+                                             Des_JoCorDep );
+           
+               ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                              system.Double( oRecordActivos.Fields.Item('u_corrdepr').Value ), 
+                                              system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ) );
+           
+               ContabilizarEnSBOCerrarAsiento(var oJEntries);
+            end;
+       
+            if (not repomo) then begin
+               // depreciacion acumulada contra gastos de depreciacion
+               oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+           
+               ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'AF-',
+                                             system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                             system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                             system.String( oParametrosData.GetProperty('U_JoDepAct') ),
+                                             Des_JoDepAct );
+           
+               ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                              system.Double( oRecordActivos.Fields.Item('u_deprecia').Value ) + 
+                                              system.Double( oRecordActivos.Fields.Item('u_corrdepm').Value ) - 
+                                              system.Double( oRecordActivos.Fields.Item('residual').Value )  , 
+                                              system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ) );
+           
+               ContabilizarEnSBOCerrarAsiento(var oJEntries);
+            end
+            else begin
+               // depreciacion con repomo
+               oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+           
+               ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'AF-',
+                                             system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                             system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                             system.String( oParametrosData.GetProperty('U_JoDepAct') ),
+                                             Des_JoDepAct );
+           
+               ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                              system.Double( oRecordActivos.Fields.Item('u_deprnom').Value ) , 
+                                              system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ) );
+       
+               ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                              system.Double( oRecordActivos.Fields.Item('u_deprecia').Value ) + 
+                                              system.Double( oRecordActivos.Fields.Item('u_corrdepm').Value ) - 
+                                              system.Double( oRecordActivos.Fields.Item('residual'  ).Value ) -
+                                              system.Double( oRecordActivos.Fields.Item('u_deprnom').Value ), 
+                                              system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ) );
+           
+               ContabilizarEnSBOCerrarAsiento(var oJEntries);
+            end;
+         end;
+
+         if (Bis33Fin) then begin
+            // Bis33  contra gastos de depreciacion            
+            lstCtaBis33.add( system.String( oRecordActivos.Fields.Item('u_ctabis33').Value ));
+//            lstCtaDepAc.add( system.String( oRecordActivos.Fields.Item('u_ctadepac').Value )); // SE cambion cuenta DepAcum por ActFijo
+            lstCtaDepAc.add( system.String( oRecordActivos.Fields.Item('u_ctaactfi').Value ));
+            lstMtoBis33.add( AjustarDecimalesSUM(system.Double( oRecordActivos.Fields.Item('Bis33').Value )));
+            lstProfitCt.add( system.String( oRecordActivos.Fields.Item('U_Project' ).Value ));
+            lstProject.add(  system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ));
+         end;
+
+         if (system.String( oParametrosData.GetProperty('U_ActbyLoc') ) = 'N') then
+            s := 'update [@VID_AFAC] set ' +
+                 '   U_PostFlag = ''Y'' ' +
+                 ' where code = ' + TMultiFunctions.QuotedStr(System.String(oRecordActivos.Fields.Item('code').value)) +
+                 '   and U_Year    = ' + vyear.ToString +
+                 '   and U_Periodo = ' + vperiod.ToString
+         else
+            s := 'update [@VID_AFAC] set ' +
+                 '   U_PostFlag = ''Y'' ' +
+                 ' where code in (select code from [@vid_afas] where u_ItmGrpCd = ' + TMultiFunctions.QuotedStr(System.String(oRecordActivos.Fields.Item('ref').value)) + ')' +
+                 '   and U_Year    = ' + vyear.ToString +
+                 '   and U_Periodo = ' + vperiod.ToString;
+
+         oRecordActividadUpd.DoQuery(s);
+
+         oRecordActivos.MoveNext;
+      end;
+
+      if (Bis33Fin) then begin        
+         s  := nil;
+         s1 := '';
+         for i:=0 to lstMtoBis33.count-1 do begin
+            if (Double(lstMtoBis33[i]) = 0) then
+               continue;
+
+            if (s <> String(lstProject[i]).Trim) then begin
+               if (s <> nil) then 
+                  ContabilizarEnSBOCerrarAsiento(var oJEntries);
+
+               oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+               ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'B33-', 'Bis33', String(lstProject[i]).Trim, '', 'Bis33' );
+
+               s  := String(lstProject[i]).Trim;
+               s1 := '';
+            end;
+
+            if (s1 <> String(lstCtaBis33[i]).Trim) then begin
+               if (s1 <> '') then begin
+                  //ingresar cuenta bis33 a voucher
+                  if (oJEntries.Lines.Count = 1) then begin
+                     oJEntries.Lines.SetCurrentLine(0);
+                     if (oJEntries.Lines.AccountCode.Trim <> '') and (oJEntries.Lines.AccountCode <> nil) then
+                        oJEntries.Lines.Add;
+                  end
+                  else 
+                     oJEntries.Lines.Add;
+                  j := oJEntries.Lines.Count-1;
+
+                  oJEntries.Lines.SetCurrentLine(j);
+                  oJEntries.Lines.AccountCode := String(lstCtaBis33[last_i]);
+                  oJEntries.Lines.ProjectCode := String(lstProject[last_i]);
+                  oJEntries.Lines.CostingCode := String(lstProfitCt[last_i]);
+                  if (TotBis33 > 0) then
+                     oJEntries.Lines.Debit   := Double(TotBis33)
+                  else
+                     oJEntries.Lines.Credit  := Double(TotBis33) * (-1);
+               end;
+
+               TotBis33 := 0;
+               s1 := String(lstCtaBis33[i]).Trim;
+            end;
+
+            TotBis33 := TotBis33 + Double(lstMtoBis33[i]);
+            last_i   := i;
+
+            // ingresar a cuenta depac
+            if (oJEntries.Lines.Count = 1) then begin
+               oJEntries.Lines.SetCurrentLine(0);
+               if (oJEntries.Lines.AccountCode.Trim <> '') and (oJEntries.Lines.AccountCode <> nil) then
+                  oJEntries.Lines.Add;
+            end
+            else 
+               oJEntries.Lines.Add;
+            j := oJEntries.Lines.Count-1;
+
+            oJEntries.Lines.SetCurrentLine(j);
+            oJEntries.Lines.AccountCode := String(lstCtaDepAc[i]);
+            oJEntries.Lines.ProjectCode := String(lstProject[i]);
+            oJEntries.Lines.CostingCode := String(lstProfitCt[i]);
+            if (Double(lstMtoBis33[i]) > 0) then
+               oJEntries.Lines.Credit   := Double(lstMtoBis33[i])
+            else
+               oJEntries.Lines.debit    := Double(lstMtoBis33[i]) * (-1);
+
+         end;
+
+         if (s1 <> '') then begin
+            //ingresar cuenta bis33 a voucher
+            if (oJEntries.Lines.Count = 1) then begin
+               oJEntries.Lines.SetCurrentLine(0);
+               if (oJEntries.Lines.AccountCode.Trim <> '') and (oJEntries.Lines.AccountCode <> nil) then
+                  oJEntries.Lines.Add;
+            end
+            else 
+               oJEntries.Lines.Add;
+            j := oJEntries.Lines.Count-1;
+
+            oJEntries.Lines.SetCurrentLine(j);
+            oJEntries.Lines.AccountCode := String(lstCtaBis33[last_i]);
+            oJEntries.Lines.ProjectCode := String(lstProject[last_i]);
+            oJEntries.Lines.CostingCode := String(lstProfitCt[last_i]);
+            if (TotBis33 > 0) then
+               oJEntries.Lines.Debit   := Double(TotBis33)
+            else
+               oJEntries.Lines.Credit  := Double(TotBis33) * (-1);
+         end;
+
+         if (s <> nil) then 
+            ContabilizarEnSBOCerrarAsiento(var oJEntries);
+      end;
+
+      oProgBar.Value := 100;
+      FCmpny.EndTransaction(BoWfTransOpt.wf_Commit);
+      Result := true;
+   finally
+      FSBOf._ReleaseCOMObject(oRecordActivos     );
+      FSBOf._ReleaseCOMObject(oRecordActividad   );
+      FSBOf._ReleaseCOMObject(oRecordActividadUpd);
+   end;
+end;
+    
+method TProcesoAF.ReversarCentralizacion(oForm: SAPbouiCOM.Form; oProgBar: SAPbouiCOM.ProgressBar): boolean;
+var
+   vyear, vperiod : integer;
+   nxYr,  nxPr    : integer;
+   IniYr, IniPr   : integer;
+   s, s1, w, w1   : string;
+   Bis33Fin       : Boolean;
+   Des_JoCorAct   : string;
+   Des_JoDepAct   : string;
+   Des_JoCorDep   : string;
+   dia            : integer;
+
+   oParametros          : SAPbobsCOM.GeneralService;
+   oParametrosData      : SAPbobsCOM.GeneralData;
+   oParametrosParameter : SAPbobsCOM.GeneralDataParams;
+
+   sCuentasCont   : String;
+   sOrderCtas     : String;
+   sGroupCtas     : String;
+
+   // Para contabilizar Bis33
+   lstCtaBis33    : List<String>;
+   lstCtaDepAc    : List<String>;
+   lstMtoBis33    : List<Double>; 
+   lstProfitCt    : List<String>; 
+   lstProject     : List<String>; 
+   TotBis33       : Double;
+   i, j, last_i   : Integer;
+
+   oJEntries           : SAPbobsCOM.JournalEntries;
+   oRecordActivos      : SAPbobsCOM.RecordSet;
+   oRecordActividad    : SAPbobsCOM.RecordSet;
+   oRecordActividadUpd : SAPbobsCOM.RecordSet;
+
+   errMsg              : string;
+   oProgBarVal         : integer;
+   oProgBarCont        : integer;
+   Repomo              : boolean;
+begin
+   try
+//      try
+         result := false;
+
+         oRecordActivos      := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+         oRecordActividad    := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+         oRecordActividadUpd := RecordSet(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset));
+
+         vyear   := FSBOf.StrToInteger(EditText(oForm.Items.Item('Year').specific).Value);
+         vperiod := FSBOf.StrToInteger(EditText(oForm.Items.Item('Period').specific).Value);
+
+         ObtenerNxtYearNxtPeriod(vYear, vPeriod, var nxYr, var nxPr, var IniYr, var IniPr);
+
+         if (not PeriodoAbierto(vyear, vperiod) ) then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Periodo_Cerrado]);
+
+         // Traer parametros
+         oRecordActividad.DoQuery('Select Code, ' +
+                                  '       (Select TrnsCodDsc from OTRC where TrnsCode = p.U_JoCorAct) Des_JoCorAct , ' +
+                                  '       (Select TrnsCodDsc from OTRC where TrnsCode = p.U_JoDepAct) Des_JoDepAct , ' +
+                                  '       (Select TrnsCodDsc from OTRC where TrnsCode = p.U_JoCorDep) Des_JoCorDep   ' +
+                                  ' from [@VID_AFPA] p ');
+         if (oRecordActividad.EoF) then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.NO_Parametros]);
+         Des_JoCorAct := System.String(oRecordActividad.Fields.Item('Des_JoCorAct').Value);
+         Des_JoDepAct := System.String(oRecordActividad.Fields.Item('Des_JoDepAct').Value);
+         Des_JoCorDep := System.String(oRecordActividad.Fields.Item('Des_JoCorDep').Value);
+         s            := System.String(oRecordActividad.Fields.Item('Code').Value);
+
+         oParametros := SAPbobsCOM.GeneralService(FCmpny.GetCompanyService.GetGeneralService('VID_mAFPA'));
+         oParametrosParameter := SAPbobsCOM.GeneralDataParams(oParametros.GetDataInterface(SAPbobsCOM.GeneralServiceDataInterfaces.gsGeneralDataParams));
+         oParametrosParameter.SetProperty('Code', s);
+         oParametrosData := oParametros.GetByParams(oParametrosParameter);
+
+         // Actividad
+         s := 'Select code ' +
+              ' from [@VID_AFAC] ' +
+              ' where ( u_year > ' + vyear.ToString + ' or ' +
+              '         ( u_year = ' + vyear.ToString + ' and u_Periodo  > ' + vperiod.ToString + ' ) ) ' +
+              '   and u_year is not null ';
+         oRecordActividad.DoQuery(s);
+         oRecordActividad.MoveFirst;
+         if (not oRecordActividad.Eof) then
+            raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Per_Post_Actividad]);
+
+         // Reversa actividad contabilizada - Voucher de reversa
+         dia := system.Int32( oParametrosData.GetProperty('U_DiaConta') );
+         case vperiod of
+            2:               dia := Math.Min(dia, 28);
+            1,3,5,7,8,10,12: dia := Math.Min(dia, 31);
+            4,6,9,11:        dia := Math.Min(dia, 30);
+         end;
+
+         Repomo := false;
+         if (System.String(oParametrosData.GetProperty('U_Repomo')).Trim = 'Y') then
+            Repomo := true;
+
+         w1 := '';
+         Bis33Fin := false; 
+         if (System.String(oParametrosData.GetProperty('U_Bis33Fin')) = 'Y') and (System.String(oParametrosData.GetProperty('U_Bis33Flg')) = 'Y') and (not GlobalSettings.IFRSNativo) then
+            Bis33Fin := true;
+
+         if (Bis33Fin) then begin
+            sCuentasCont := ' a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde, a.u_ctabis33 ';
+            sOrderCtas   := ' order by a.U_Project, a.u_ctabis33, a.u_ctagasde ';
+            sGroupCtas   := ' a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde, a.u_ctabis33 ';
+
+            lstCtaBis33  := new List<String>;
+            lstCtaDepAc  := new List<String>;
+            lstMtoBis33  := new List<Double>; 
+            lstProfitCt  := new List<String>;
+            lstProject   := new List<String>;
+         end
+         else if (GlobalSettings.IFRSNativo) then begin
+            w1           := " and isnull(a.U_ActTipo , 'N') <> 'T' ";
+            // no se utilizan u_ctacoraf,  u_ctacorda
+            sCuentasCont := " a.u_ctaactfi,  a.u_ctadepac,  a.u_ctagasde, '' u_ctabis33 ";
+            sOrderCtas   := " ";
+            sGroupCtas   := " a.u_ctaactfi,  a.u_ctadepac,  a.u_ctagasde ";
+         end
+         else begin
+            sCuentasCont := " a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde, '' u_ctabis33 ";
+            sOrderCtas   := " ";
+            sGroupCtas   := " a.u_ctaactfi,  a.u_ctacoraf,  a.u_ctacorda,  a.u_ctadepac,  a.u_ctagasde  ";
+         end;
+
+         // Proceso por grupos de activos
+         w := '';
+         if (oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx <> '') then
+            w := " and a.U_ItmGrpCd = '" + oForm.DataSources.UserDataSources.Item('DSGrupo').ValueEx.Trim + "'";
+
+         // la consulta de actividad es por item o por grupos de items
+         if (system.String( oParametrosData.GetProperty('U_ActbyLoc') ) = 'N') then begin
+            s := 'Select count(*) cant ' +
+                 ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code ' +
+                 ' where b.u_year     = ' + vyear.ToString   +
+                 '   and b.u_periodo  = ' + vperiod.ToString +
+                 w + w1 +
+                 '   and b.u_postflag = ''Y'' ';
+            oRecordActivos.DoQuery(s);
+            oProgBarVal := System.Int32(oRecordActivos.Fields.Item('cant').Value);
+
+               s := 'Select a.U_ActCode ref, a.code, a.U_Project, a.U_ProfitCt, ' +
+                    sCuentasCont + ',' +
+                    '       b.u_corracti, b.u_corrdepr, b.u_deprecia, b.u_corrdepm, b.u_deprnom,  ' +
+                    '       z.Bis33, ' +
+                    '       case when a.u_pervidau - a.u_oriperdp = TotPerDepre and b.u_perdepre = 1 and b.u_pervidut = 0 then a.U_ValResid else 0 end + ' +
+                    '       case when a.u_pervidau - a.u_oriperdp - TotPerDepre + 1 = b.u_pervidut and b.u_pervidut > 1 then -1*a.U_ValResid else 0 end residual ' +
+
+                    ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code ' +
+
+                    '                    inner join (select  code, sum(U_PerDepre) TotPerDepre ' +
+                    '                                  from [@vid_afac] ' +
+                    '                                 where (U_Year < ' + vyear.ToString + ') or (u_year = ' + vyear.ToString + ' and u_periodo <= ' + vperiod.ToString + ') ' +
+                    '                                 group by code ' +
+                    '                                ) Y on a.code = Y.code ' +
+
+                    '               left outer join (select code, sum(isnull(U_Bis33,0)) Bis33 ' +
+                    '                                  from [@VID_AFSA] sa ' +
+                    '                                  where U_Year = ' + vyear.ToString +
+                    '                                  group by code ' +
+                    '                                ) Z on a.Code = Z.Code ' +
+
+                    ' where b.u_year     = ' + vyear.ToString   +
+                    '   and b.u_periodo  = ' + vperiod.ToString +
+                    w + w1 +
+                    '   and b.u_postflag = ''Y'' ' +
+                    sOrderCtas ;
+
+            errMsg := 'activo';
+         end
+         else begin
+            s := 'Select count(*) cant from ( ' +
+                 'Select a.U_ItmGrpCd ref, a.U_Project, a.U_ProfitCt, ' +
+                  sCuentasCont + ',' +
+                 '       sum(b.u_corracti) u_corracti, sum(b.u_corrdepr) u_corrdepr, sum(b.u_deprecia) u_deprecia, sum(b.u_corrdepm) u_corrdepm, sum(b.u_deprnom) u_deprnom' +
+                 ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code ' +
+                 ' where b.u_year     = ' + vyear.ToString   +
+                 '   and b.u_periodo  = ' + vperiod.ToString +
+                 w + w1 +
+                 '   and b.u_postflag = ''Y'' ' +
+                 ' group by a.U_ItmGrpCd, a.U_Project, a.U_ProfitCt, ' + sGroupCtas +
+                 ' ) T0 ' ;
+            oRecordActivos.DoQuery(s);
+            oProgBarVal := System.Int32(oRecordActivos.Fields.Item('cant').Value);
+
+               s := 'Select a.U_ItmGrpCd ref, a.U_Project, a.U_ProfitCt, ' +
+                    sCuentasCont + ',' +
+                    '       sum(b.u_corracti) u_corracti, sum(b.u_corrdepr) u_corrdepr, sum(b.u_deprecia) u_deprecia, sum(b.u_corrdepm) u_corrdepm, sum(b.u_deprnom) u_deprnom, ' +
+                    '       sum(z.Bis33) Bis33, ' +
+                    '       sum(case when a.u_pervidau - a.u_oriperdp = TotPerDepre and b.u_perdepre = 1 and b.u_pervidut = 0 then a.U_ValResid else 0 end) + ' +
+                    '       sum(case when a.u_pervidau - a.u_oriperdp - TotPerDepre + 1 = b.u_pervidut and b.u_pervidut > 1 then -1*a.U_ValResid else 0 end) residual ' +
+
+                    ' from [@VID_AFAS] a inner join [@vid_afac] b on a.code = b.code ' +
+
+                    '                    inner join (select  code, sum(U_PerDepre) TotPerDepre ' +
+                    '                                  from [@vid_afac] ' +
+                    '                                 where (U_Year < ' + vyear.ToString + ') or (u_year = ' + vyear.ToString + ' and u_periodo <= ' + vperiod.ToString + ') ' +
+                    '                                 group by code ' +
+                    '                                ) Y on a.code = Y.code ' +
+
+                    '               left outer join (select code, sum(isnull(U_Bis33,0)) Bis33 ' +
+                    '                                  from [@VID_AFSA] sa ' +
+                    '                                  where U_Year = ' + vyear.ToString +
+                    '                                  group by code ' +
+                    '                                ) Z on a.Code = Z.Code ' +
+
+                    ' where b.u_year     = ' + vyear.ToString   +
+                    '   and b.u_periodo  = ' + vperiod.ToString +
+                    w + w1 +
+                    '   and b.u_postflag = ''Y'' ' +
+                    ' group by a.U_ItmGrpCd, a.U_Project, a.U_ProfitCt, ' + sGroupCtas +
+                    sOrderCtas ;
+
+            errMsg := 'grupo';
+         end;
+
+         oRecordActivos.DoQuery(s);
+         oRecordActivos.MoveFirst;
+
+         oProgBarCont := 0;
+         while (not oRecordActivos.Eof) do begin
+            inc(oProgBarCont);
+            var d1 : Double := oProgBarCont*100/oProgBarVal;
+            oProgBar.Value := Convert.ToInt32(Math.Round(d1));
+            oProgBar.text  := System.String(oRecordActivos.Fields.Item('ref').value);
+
+            if (system.String( oRecordActivos.Fields.Item('u_ctaactfi').Value ) = '') then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_ActFij] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+            if (not GlobalSettings.IFRSNativo) then begin
+               if (system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ) = '') then
+                  raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_CorrActFij] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+               if (system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ) = '') then
+                  raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_CorrDepr] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+            end;
+            if (system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ) = '') then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_DepAcum] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+            if (system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ) = '') then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_GasDep] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+            if (system.String( oRecordActivos.Fields.Item('u_ctabis33').Value ) = '') and (Bis33Fin) then
+               raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Cuenta_no_def_Bis33] + errMsg + ': ' + system.String( oRecordActivos.Fields.Item('ref').Value ));
+
+            if (GlobalSettings.IFRSNativo) then begin
+                  // depreciacion acumulada contra gastos de depreciacion
+                  oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+              
+                  ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'RAF-',
+                                                system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                                system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                                system.String( oParametrosData.GetProperty('U_JoDepAct') ),
+                                                Des_JoDepAct );
+              
+                  ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                                 system.Double( oRecordActivos.Fields.Item('u_deprecia').Value ) - 
+                                                 system.Double( oRecordActivos.Fields.Item('residual').Value )  , 
+                                                 system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ) );
+              
+                  ContabilizarEnSBOCerrarAsiento(var oJEntries);
+            end;
+        
+            if (not GlobalSettings.IFRSNativo) then begin
+               // activo fijo contra correccion de activos (Repomo)
+          
+               oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+          
+               ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'RAF-',
+                                             system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                             system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                             system.String( oParametrosData.GetProperty('U_JoCorAct') ),
+                                             Des_JoCorAct );
+          
+               ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                              system.Double( oRecordActivos.Fields.Item('u_corracti').Value ), 
+                                              system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ),
+                                              system.String( oRecordActivos.Fields.Item('u_ctaactfi').Value ) );
+          
+               ContabilizarEnSBOCerrarAsiento(var oJEntries);
+          
+               if (not repomo) then begin
+                  // depreciacion acumulada contra correccion de depreciacion
+                  oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+              
+                  ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'RAF-',
+                                                system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                                system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                                system.String( oParametrosData.GetProperty('U_JoCorDep') ),
+                                                Des_JoCorDep );
+              
+                  ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                                 system.Double( oRecordActivos.Fields.Item('u_corrdepr').Value ), 
+                                                 system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ) );
+              
+                  ContabilizarEnSBOCerrarAsiento(var oJEntries);
+               end
+               else begin
+                  // depreciacion acumulada contra correccion
+                  oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+              
+                  ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'RAF-',
+                                                system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                                system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                                system.String( oParametrosData.GetProperty('U_JoCorDep') ),
+                                                Des_JoCorDep );
+              
+                  ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                                 system.Double( oRecordActivos.Fields.Item('u_corrdepr').Value ), 
+                                                 system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ) );
+              
+                  ContabilizarEnSBOCerrarAsiento(var oJEntries);
+               end;
+          
+               if (not repomo) then begin
+                  // depreciacion acumulada contra gastos de depreciacion
+                  oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+              
+                  ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'RAF-',
+                                                system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                                system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                                system.String( oParametrosData.GetProperty('U_JoDepAct') ),
+                                                Des_JoDepAct );
+              
+                  ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                                 system.Double( oRecordActivos.Fields.Item('u_deprecia').Value ) + 
+                                                 system.Double( oRecordActivos.Fields.Item('u_corrdepm').Value ) - 
+                                                 system.Double( oRecordActivos.Fields.Item('residual').Value )  , 
+                                                 system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ) );
+              
+                  ContabilizarEnSBOCerrarAsiento(var oJEntries);
+               end
+               else begin
+                  // depreciacion con repomo
+                  oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+              
+                  ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'RAF-',
+                                                system.String( oRecordActivos.Fields.Item('ref'       ).Value ),
+                                                system.String( oRecordActivos.Fields.Item('U_Project' ).Value ),
+                                                system.String( oParametrosData.GetProperty('U_JoDepAct') ),
+                                                Des_JoDepAct );
+              
+                  ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                                 system.Double( oRecordActivos.Fields.Item('u_deprnom').Value ) , 
+                                                 system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctadepac').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctagasde').Value ) );
+          
+                  ContabilizarEnSBOInsertarValor(var oJEntries, 
+                                                 system.Double( oRecordActivos.Fields.Item('u_deprecia').Value ) + 
+                                                 system.Double( oRecordActivos.Fields.Item('u_corrdepm').Value ) - 
+                                                 system.Double( oRecordActivos.Fields.Item('residual'  ).Value ) -
+                                                 system.Double( oRecordActivos.Fields.Item('u_deprnom').Value ), 
+                                                 system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctacorda').Value ),
+                                                 system.String( oRecordActivos.Fields.Item('u_ctacoraf').Value ) );
+              
+                  ContabilizarEnSBOCerrarAsiento(var oJEntries);
+               end;
+            end;
+  
+            if (Bis33Fin) then begin
+               // Bis33  contra gastos de depreciacion
+               lstCtaBis33.add( system.String( oRecordActivos.Fields.Item('u_ctabis33').Value ));
+//            lstCtaDepAc.add( system.String( oRecordActivos.Fields.Item('u_ctadepac').Value )); // SE cambion cuenta DepAcum por ActFijo
+               lstCtaDepAc.add( system.String( oRecordActivos.Fields.Item('u_ctaactfi').Value ));
+               lstMtoBis33.add( AjustarDecimalesSUM(system.Double( oRecordActivos.Fields.Item('Bis33').Value )));
+               lstProfitCt.add( system.String( oRecordActivos.Fields.Item('U_Project' ).Value ));
+               lstProject.add(  system.String( oRecordActivos.Fields.Item('U_ProfitCt').Value ));
+            end;
+
+            if (system.String( oParametrosData.GetProperty('U_ActbyLoc') ) = 'N') then
+               s := 'update [@VID_AFAC] set ' +
+                    '   U_PostFlag = ''N'' ' +
+                    ' where code = ' + TMultiFunctions.QuotedStr(System.String(oRecordActivos.Fields.Item('code').value)) +
+                    '   and U_Year    = ' + vyear.ToString +
+                    '   and U_Periodo = ' + vperiod.ToString
+            else
+               s := 'update [@VID_AFAC] set ' +
+                    '   U_PostFlag = ''N'' ' +
+                    ' where code in (select code from [@vid_afas] where u_ItmGrpCd = ' + TMultiFunctions.QuotedStr(System.String(oRecordActivos.Fields.Item('ref').value)) + ')' +
+                    '   and U_Year    = ' + vyear.ToString +
+                    '   and U_Periodo = ' + vperiod.ToString;
+
+            oRecordActividadUpd.DoQuery(s);
+
+            oRecordActivos.MoveNext;
+         end;
+
+         if (Bis33Fin) then begin        
+            s  := nil;
+            s1 := '';
+            for i:=0 to lstMtoBis33.count-1 do begin
+               if (Double(lstMtoBis33[i]) = 0) then
+                  continue;
+
+               if (s <> String(lstProject[i]).Trim) then begin
+                  if (s <> nil) then 
+                     ContabilizarEnSBOCerrarAsiento(var oJEntries);
+
+                  oJEntries := JournalEntries(FCmpny.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries));
+                  ContabilizarEnSBOCrearAsiento(var oJEntries, vYear, vPeriod, dia, 'RB33-', 'Bis33 - Reversa', String(lstProject[i]).Trim, '', 'Bis33 - Reversa' );
+
+                  s  := String(lstProject[i]).Trim;
+                  s1 := '';
+               end;
+
+               if (s1 <> String(lstCtaBis33[i]).Trim) then begin
+                  if (s1 <> '') then begin
+                     //ingresar cuenta bis33 a voucher
+                     if (oJEntries.Lines.Count = 1) then begin
+                        oJEntries.Lines.SetCurrentLine(0);
+                        if (oJEntries.Lines.AccountCode.Trim <> '') and (oJEntries.Lines.AccountCode <> nil) then
+                           oJEntries.Lines.Add;
+                     end
+                     else 
+                        oJEntries.Lines.Add;
+                     j := oJEntries.Lines.Count-1;
+
+                     oJEntries.Lines.SetCurrentLine(j);
+                     oJEntries.Lines.AccountCode := String(lstCtaBis33[last_i]);
+                     oJEntries.Lines.ProjectCode := String(lstProject[last_i]);
+                     oJEntries.Lines.CostingCode := String(lstProfitCt[last_i]);
+                     if (TotBis33 > 0) then
+                        oJEntries.Lines.Credit   := Double(TotBis33)
+                     else
+                        oJEntries.Lines.Debit  := Double(TotBis33) * (-1);
+                  end;
+
+                  TotBis33 := 0;
+                  s1 := String(lstCtaBis33[i]).Trim;
+               end;
+
+               TotBis33 := TotBis33 + Double(lstMtoBis33[i]);
+               last_i   := i;
+
+               // ingresar a cuenta depac
+               if (oJEntries.Lines.Count = 1) then begin
+                  oJEntries.Lines.SetCurrentLine(0);
+                  if (oJEntries.Lines.AccountCode.Trim <> '') and (oJEntries.Lines.AccountCode <> nil) then
+                     oJEntries.Lines.Add;
+               end
+               else 
+                  oJEntries.Lines.Add;
+               j := oJEntries.Lines.Count-1;
+
+               oJEntries.Lines.SetCurrentLine(j);
+               oJEntries.Lines.AccountCode := String(lstCtaDepAc[i]);
+               oJEntries.Lines.ProjectCode := String(lstProject[i]);
+               oJEntries.Lines.CostingCode := String(lstProfitCt[i]);
+               if (Double(lstMtoBis33[i]) > 0) then
+                  oJEntries.Lines.Debit   := Double(lstMtoBis33[i])
+               else
+                  oJEntries.Lines.Credit    := Double(lstMtoBis33[i]) * (-1);
+
+            end;
+
+            if (s1 <> '') then begin
+               //ingresar cuenta bis33 a voucher
+               if (oJEntries.Lines.Count = 1) then begin
+                  oJEntries.Lines.SetCurrentLine(0);
+                  if (oJEntries.Lines.AccountCode.Trim <> '') and (oJEntries.Lines.AccountCode <> nil) then
+                     oJEntries.Lines.Add;
+               end
+               else 
+                  oJEntries.Lines.Add;
+               j := oJEntries.Lines.Count-1;
+
+               oJEntries.Lines.SetCurrentLine(j);
+               oJEntries.Lines.AccountCode := String(lstCtaBis33[last_i]);
+               oJEntries.Lines.ProjectCode := String(lstProject[last_i]);
+               oJEntries.Lines.CostingCode := String(lstProfitCt[last_i]);
+               if (TotBis33 > 0) then
+                  oJEntries.Lines.Credit   := Double(TotBis33)
+               else
+                  oJEntries.Lines.Debit  := Double(TotBis33) * (-1);
+            end;
+
+            if (s <> nil) then 
+               ContabilizarEnSBOCerrarAsiento(var oJEntries);
+         end;
+      
+         oProgBar.Value := 100;
+         result := true;
+//      except
+//         on e: exception do begin
+//            if (FCmpny.InTransaction) then
+//               FCmpny.EndTransaction(BoWfTransOpt.wf_RollBack);
+//            FSBOApp.StatusBar.SetText(e.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error);
+//            OutLog(e.Message + ' - ' + e.StackTrace);
+//         end;
+//      end;
+   finally
+      FSBOf._ReleaseCOMObject(oRecordActivos     );
+      FSBOf._ReleaseCOMObject(oRecordActividad   );
+      FSBOf._ReleaseCOMObject(oRecordActividadUpd);
+   end;
+end;
+                       
+method TProcesoAF.ContabilizarEnSBOCrearAsiento(var oJE: SAPbobsCOM.JournalEntries; Year, Period, Day: Integer; ref, ref2, Project, TranCode, Memo: String);
+begin
+   oJE.ReferenceDate   := TMultiFunctions.EncodeDate(Year, Period, Day);
+   oJE.TaxDate         := TMultiFunctions.EncodeDate(Year, Period, Day);
+   oJE.DueDate         := TMultiFunctions.EncodeDate(Year, Period, Day);
+   oJE.Reference       := ref + Year.ToString + '-' + Period.ToString;
+   oJE.Reference2      := ref2;
+   oJE.TransactionCode := TranCode;
+   oJE.Memo            := Memo;
+   oJE.ProjectCode     := Project;
+end;
+
+method TProcesoAF.ContabilizarEnSBOInsertarValor(var oJE: SAPbobsCOM.JournalEntries; oValor: Double; CtoCosto, CtaDebit, CtaCredit: String);
+var
+   i : Integer;
+begin
+   oValor := AjustarDecimalesSUM(oValor);
+   if (oValor = 0) then
+      exit;
+
+   if (oJE.Lines.Count = 1) then begin
+      oJE.Lines.SetCurrentLine(0);
+      if (oJE.Lines.AccountCode.Trim <> '') and (oJE.Lines.AccountCode <> nil) then
+         oJE.Lines.Add;
+   end
+   else 
+      oJE.Lines.Add;
+   i := oJE.Lines.Count-1;
+
+   oJE.Lines.SetCurrentLine(i);
+   oJE.Lines.AccountCode := CtaDebit;
+   oJE.Lines.ProjectCode := oJE.ProjectCode;
+   oJE.Lines.CostingCode := CtoCosto;
+   if (oValor > 0) then
+      oJE.Lines.Debit   := oValor
+   else
+      oJE.Lines.Credit  := oValor * (-1);
+
+   oJE.Lines.Add;
+   inc(i);
+
+   oJE.Lines.SetCurrentLine(i);
+   oJE.Lines.AccountCode := CtaCredit;
+   oJE.Lines.ProjectCode := oJE.ProjectCode;
+   oJE.Lines.CostingCode := CtoCosto;
+   if (oValor > 0) then
+      oJE.Lines.Credit   := oValor
+   else
+      oJE.Lines.Debit  := oValor * (-1);
+end;
+
+method TProcesoAF.ContabilizarEnSBOCerrarAsiento(var oJE: SAPbobsCOM.JournalEntries);
+var
+   errCode : int32;
+   errMsg  : String;
+//   oFile   : String;
+begin
+   try
+//      oFile := 'C:\Documents and Settings\Administrador\Mis documentos\SBO\SBO Prism SVN\oJE.xml';
+//      oJE.SaveToFile(oFile);
+
+      if (oJE.Lines.Count < 2) then
+         exit;
+
+      errCode := oJE.Add;
+      if (errCode <> 0) then begin
+         FCmpny.GetLastError(out errCode, out errMsg);
+         raise new Exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Error_contabilzacion] + TMultiFunctions.inttostr(errCode) + ' - ' + errMsg);
+      end;
+   finally
+      FSBOF._ReleaseCOMObject(oJE);
+   end;
+end;
+
+method TProcesoAF.ProcesoFinanciero(var oActivosData, oParametrosData, oActivosLinesData: SAPbobsCOM.GeneralData; var oActivosLines: SAPbobsCOM.GeneralDataCollection; var oRecordActividad: SAPbobsCOM.RecordSet; Indices: TIndice; nxYr, nxPr: integer; var TopeLey33Bis: Double);
+var
+   indiceOri    : double;
+   FactorIpc    : double;
+   FactorBis33  : double;
+   Corrige_Flag : boolean;
+   Bis33_flag   : boolean;
+
+   ActYear           : array [0..12] of TActividaMensual;
+   LstActivoAdicion  : List<TActivoAdicion>;
+   ActivoAdicion     : TActivoAdicion;
+   i, j              : integer;
+
+   U_NextYear : integer;
+   U_NextPer  : integer;
+   U_NxYrDepr : integer;
+   U_NxPrDepr : integer;
+   U_InitYear : integer;
+   U_InitPer  : integer;
+   U_Bis33Fin : double;
+   U_Orifec   : DateTime;
+   U_PorResid : double;
+
+   U_OriValCo : double;
+   U_OriDepre : Double;
+   U_CurVal   : double;
+   U_DepAcum  : double;
+   U_DepAcumN : double;
+   U_CorAnuAc : double;
+   U_CorAnuDe : double;
+   U_DepreAnu : double;
+   U_PerDepre : integer;
+   U_PerDepYr : integer;
+   U_PerVidaU : integer;
+   U_AdicAnuC : double;
+
+   VALOR_RESIDUAL      : double;
+   ADICIONES_TOTALES   : double;
+   ADICIONES_ANUALES   : double;
+
+   ACT_VALOR_NOMINAL   : double;
+   ACT_VALOR_CORREGIDO : double;
+   ACT_DEPRE_CORREGIDA : double;
+   DEPREC_NOMINAL      : double;
+   DEPREC_ANUAL_TOTAL  : double;
+   DEPREC_PERIODO      : double;
+   DEPREC_ANUAL_NOM    : double;
+   PERIODOS_DEPREC     : integer;
+   VIDA_UTIL           : integer;
+   UNID_DEPREC         : Integer;
+
+   NvoValActivo         : double;
+   CorrActi             : double;
+   CorrDepr             : double;
+   CorrDeprM            : double;
+   PerDep               : integer;
+   Deprecia_Flag        : boolean;
+   inicioActiv          : integer;
+
+   Ley33Bis           : double;
+   s:                 string;
+   nxYrIns, nxPrIns:  integer;
+begin
+   try
+      LstActivoAdicion := New List<TActivoAdicion>;
+            // valores actuales del activo
+        
+            U_NextYear := System.Int32(oActivosData.GetProperty('U_NextYear'));
+            U_NextPer  := System.Int32(oActivosData.GetProperty('U_NextPer' ));
+            U_NxYrDepr := System.Int32(oActivosData.GetProperty('U_NxYrDepr'));
+            U_NxPrDepr := System.Int32(oActivosData.GetProperty('U_NxPrDepr'));
+            U_InitYear := System.Int32(oActivosData.GetProperty('U_InitYear'));
+            U_InitPer  := System.Int32(oActivosData.GetProperty('U_InitPer' ));
+            U_Bis33Fin := System.Double(oActivosData.GetProperty('U_Bis33Fin'));
+            U_OriFec   := System.DateTime(oActivosData.GetProperty('U_OriFec'));
+            U_PorResid := 1-System.Double(oActivosData.GetProperty('U_PorResid'))/100;
+                
+            U_OriValCo := System.Double(oActivosData.GetProperty('U_OriValCo'));    //  ANT_VALOR_ORIGINAL
+            U_OriDepre := System.Double(oActivosData.GetProperty('U_OriDepre'));    //  ANT_DEPRECIACION_ORIGINAL
+            U_CurVal   := System.Double(oActivosData.GetProperty('U_CurVal'  ));    //  ANT_VALOR_ACTUAL
+            U_DepAcum  := System.Double(oActivosData.GetProperty('U_DepAcum' ));    //  ANT_DEPRACUMULADA
+            U_DepAcumN := System.Double(oActivosData.GetProperty('U_DepAcumN'));    //
+            U_CorAnuAc := System.Double(oActivosData.GetProperty('U_CorAnuAc'));    //  ANT_CORRANUALACTIVO
+            U_CorAnuDe := System.Double(oActivosData.GetProperty('U_CorAnuDe'));    //  ANT_CORRANUALDEPR
+            U_DepreAnu := System.Double(oActivosData.GetProperty('U_DepreAnu'));    //  ANT_DEPRANUAL
+            U_PerDepre := System.Int32(oActivosData.GetProperty ('U_PerDepre'));    //  ANT_PERDEPRECIADOS
+            U_PerDepYr := System.Int32(oActivosData.GetProperty ('U_PerDepYr'));    //  ANT_PERDEPRECYEAR
+            U_PerVidaU := System.Int32(oActivosData.GetProperty ('U_PerVidaU'));    //  ANT_VIDAUTIL
+            U_AdicAnuC := System.double(oActivosData.GetProperty('U_AdicAnuC'));    //  ANT_ADIC_ANUCORR
+       
+            // Actualiza VID_AFAS
+            if (nxPr = 1) then begin
+//        Se cambio y se descuenta del valor del activo el bis33
+//               U_CurVal   := U_CurVal  + U_CorAnuAc + U_AdicAnuC;
+//               U_DepAcum  := U_DepAcum + U_CorAnuDe + U_DepreAnu + U_Bis33Fin;
+               U_CurVal   := U_CurVal  + U_CorAnuAc + U_AdicAnuC - U_Bis33Fin;
+               U_DepAcum  := U_DepAcum + U_CorAnuDe + U_DepreAnu;
+               U_CorAnuAc := 0;
+               U_DepreAnu := 0;
+               U_AdicAnuC := 0;
+               U_CorAnuDe := 0;
+               U_PerDepYr := 0;
+        
+               oActivosData.SetProperty('U_CurVal'  , U_CurVal   );
+               oActivosData.SetProperty('U_DepAcum' , U_DepAcum  );
+               oActivosData.SetProperty('U_CorAnuAc', U_CorAnuAc );
+               oActivosData.SetProperty('U_DepreAnu', U_DepreAnu );
+               oActivosData.SetProperty('U_AdicAnuC', U_AdicAnuC );
+               oActivosData.SetProperty('U_CorAnuDe', U_CorAnuDe );
+               oActivosData.SetProperty('U_PerDepYr', U_PerDepYr );
+            end;
+        
+            //... Finanaciera ... llenar actividad anual
+            for j:=0 to 12 do begin
+               ActYear[j] := new TActividaMensual;
+               if (j=0) then begin
+                  ActYear[j].Year      := nxYr-1;
+                  ActYear[j].Per       := 12;
+               end
+               else begin
+                  ActYear[j].Year      := nxYr;
+                  ActYear[j].Per       := j;
+               end;
+               ActYear[j].CorrAct   := 0;
+               ActYear[j].CorrDep   := 0;
+               ActYear[j].DeprMes   := 0;
+               ActYear[j].DeprNoAct := 0;
+               ActYear[j].CorDepM   := 0;
+               ActYear[j].AdicVal   := 0;
+               ActYear[j].AdicVid   := 0;
+               ActYear[j].PerDepre  := 0;
+            end;
+        
+            if (U_InitYear <> nxYr) then
+               inicioActiv := 0
+            else
+               inicioActiv := U_InitPer;
+                
+            // insertar adiciones de la misma fecha de ingreso del activo
+            //... Marcar ... VID_AFAD para el periodo como procesado
+            ADICIONES_TOTALES := 0;
+            ADICIONES_ANUALES := 0;
+            oActivosLines     := oActivosData.Child('VID_AFAD');
+            for i:=0 to oActivosLines.Count - 1 do begin
+               oActivosLinesData := oActivosLines.Item(i);
+               if (System.String(oActivosLinesData.GetProperty('U_Procesad')) = 'Y') then begin
+                  ADICIONES_TOTALES := ADICIONES_TOTALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+                  if (System.Int32(oActivosLinesData.GetProperty('U_Year')) = nxYr) then
+                     ADICIONES_ANUALES := ADICIONES_ANUALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+               end;
+        
+               if (System.Int32(oActivosLinesData.GetProperty('U_Year')) <> nxYr) or (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) <> nxPr) then
+                  Continue
+               else begin
+                  s := 'Y';
+                  oActivosLinesData.SetProperty('U_Procesad', s);
+                  ADICIONES_TOTALES := ADICIONES_TOTALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+                  ADICIONES_ANUALES := ADICIONES_ANUALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+        
+                  ActYear[nxPr].AdicVal  := ActYear[nxPr].AdicVal + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+                  if (System.String(oParametrosData.GetProperty('U_AdicVdUt')).Trim = 'Y') then
+                     ActYear[nxPr].AdicVid  := ActYear[nxPr].AdicVid + System.Int32(oActivosLinesData.GetProperty('U_PerVidUt'));
+               end;
+            end;
+        
+            // Determinar si debe depreciarse o solo corregirse
+        
+            Deprecia_Flag  := False;
+            Corrige_Flag   := True;
+            if (System.String(oActivosData.GetProperty('U_ConDepre')) = 'Y') and ((nxYr > U_NxYrDepr) or ((nxYr = U_NxYrDepr) and (nxPr >= U_NxPrDepr))) then 
+               Deprecia_Flag  := true;
+        
+            // Financiero
+        
+            UNID_DEPREC := 0;
+            if (System.String(oActivosData.GetProperty('U_TipoDep')) = 'U') then begin
+               s := "select isnull(d.U_Uso,0) Uso " +
+                    "  from [@VID_AFUS] h inner join [@VID_AFUSD] d on h.DocEntry = d.DocEntry " +
+                    " where h.U_Year    = " + nxYr.ToString +
+                    "   and h.U_Periodo = " + nxPr.ToString +
+                    "   and d.U_ActCode = " + TMultiFunctions.QuotedStr(System.String(oActivosData.GetProperty('U_ActCode'))) ;
+                oRecordActividad.DoQuery(s);
+                if (not oRecordActividad.EoF) then
+                   UNID_DEPREC := System.Int32(oRecordActividad.Fields.Item('Uso').Value);
+             end
+             else 
+                UNID_DEPREC := 1;
+
+            s := 'Select U_Year, U_Periodo, U_CorrActi, U_CorrDepr, U_Deprecia, U_CorrDepM, U_Adicion, U_DeprNom, U_PerVidUt, U_PerDepre ' + // incorpora uso mensual, se corrige y se divide por uso sumado anual
+                 '  from [@VID_AFAC] ' +
+                 ' where Code   = ' + TMultiFunctions.QuotedStr(System.String(oActivosData.GetProperty('Code'))) +
+                 '   and U_Year = ' + nxYr.ToString +
+                 ' order by U_Periodo ';
+            oRecordActividad.DoQuery(s);
+        
+            LstActivoAdicion.Clear;        
+            ActivoAdicion := new TActivoAdicion;
+            InitActivoAdicion(var ActivoAdicion);
+            LstActivoAdicion.Add(ActivoAdicion);
+        
+            ActivoAdicion.PeriodoInicial       := inicioActiv;
+            if (inicioActiv = 0) then begin
+               ActivoAdicion.ValorInicialActivo   := U_CurVal;
+               ActivoAdicion.ValorInicialDeprec   := U_DepAcum;
+               ActivoAdicion.ValorCorregidoActivo := U_CurVal;
+               ActivoAdicion.ValorCorregidoDeprec := U_DepAcum;
+            end
+            else begin
+               ActivoAdicion.ValorInicialActivo   := U_CurVal + ActYear[inicioActiv].AdicVal;
+               ActivoAdicion.ValorInicialDeprec   := U_DepAcum;
+               ActivoAdicion.ValorCorregidoActivo := U_CurVal + ActYear[inicioActiv].AdicVal;
+               ActivoAdicion.ValorCorregidoDeprec := U_DepAcum;
+            end;
+        
+            // Solo activos con actvidad mensual
+            i := System.Int32 (oRecordActividad.Fields.Item('U_Periodo' ).value);
+            while (not oRecordActividad.EoF)  do begin
+               ActYear[i].Year      := nxYr;
+               ActYear[i].Per       := System.Int32 (oRecordActividad.Fields.Item('U_Periodo' ).value);
+               ActYear[i].CorrAct   := System.Double(oRecordActividad.Fields.Item('U_CorrActi').value);
+               ActYear[i].CorrDep   := System.Double(oRecordActividad.Fields.Item('U_CorrDepr').value);
+               ActYear[i].DeprMes   := System.Double(oRecordActividad.Fields.Item('U_Deprecia').value);
+               ActYear[i].DeprNoAct := System.Double(oRecordActividad.Fields.Item('U_DeprNom' ).value);
+               ActYear[i].CorDepM   := System.Double(oRecordActividad.Fields.Item('U_CorrDepM').value);
+               ActYear[i].AdicVal   := System.Double(oRecordActividad.Fields.Item('U_Adicion' ).value);
+               ActYear[i].AdicVid   := System.Int32(oRecordActividad.Fields.Item('U_PerVidUt').value);
+               ActYear[i].PerDepre  := System.Int32(oRecordActividad.Fields.Item('U_PerDepre').value);
+        
+               if (ActYear[i].AdicVal > 0) then begin
+                  if (i = inicioActiv) then
+                     ActivoAdicion.ValorInicialActivo := U_CurVal  + ActYear[i].AdicVal
+                  else begin
+                     ActivoAdicion := new TActivoAdicion;
+                     InitActivoAdicion(var ActivoAdicion);
+                     LstActivoAdicion.Add(ActivoAdicion);
+        
+                     ActivoAdicion.PeriodoInicial := i;
+                     ActivoAdicion.ValorInicialActivo   := ActYear[i].AdicVal;
+                  end;
+               end;
+        
+               inc(i);
+               oRecordActividad.MoveNext;
+            end;
+            if (ActYear[nxPr].AdicVal > 0) and (nxPr <> inicioActiv) then begin
+               ActivoAdicion := new TActivoAdicion;
+               InitActivoAdicion(var ActivoAdicion);
+               LstActivoAdicion.Add(ActivoAdicion);
+        
+               ActivoAdicion.PeriodoInicial := nxPr;
+               ActivoAdicion.ValorInicialActivo   := ActYear[nxPr].AdicVal;
+            end;
+                
+            // Primero se corrige luego se deprecia, para cada adicion y valor inicial del activo
+            // al existir  AdicVid, se aumenta la vida util y en es periodo se produce un quiebre.
+            // Las depreciaciones anteriores se calculan hasta el periodo de quiebre (n) y se corrigen para llevar al periodos futuros (equivale depacum anual)
+            // Las correcciones de los activos se llevan al periodo de quiebre
+            // ActYear[i].PerDepre -> indica la catidad de periodos depreciados entre quiebres
+            // ActYear[i].Periodos -> indica la catidad de periodos por corregis entre quiebres
+        
+            // Calculos de valores de adiciones
+            VIDA_UTIL       := System.int32(oActivosData.GetProperty('U_VidaUtil'));
+            if (UNID_DEPREC > VIDA_UTIL) then
+               UNID_DEPREC := VIDA_UTIL;
+            PERIODOS_DEPREC := UNID_DEPREC;
+
+            j := LstActivoAdicion.Count-1;
+            ActivoAdicion := TActivoAdicion(LstActivoAdicion[j]);
+            for i:=nxPr downto inicioActiv do begin
+               if (ActYear[i].AdicVid > 0) and (i = nxPr) then begin   
+                  ActivoAdicion.VidaUtil   := VIDA_UTIL + ActYear[i].AdicVid;
+                  ActivoAdicion.AdicVida   := ActYear[i].AdicVid;
+                  if (Deprecia_Flag) then
+                     ActivoAdicion.PeriodosDerpreciados := PERIODOS_DEPREC
+                  else
+                     ActivoAdicion.PeriodosDerpreciados := 0;
+
+                  PERIODOS_DEPREC := 0;
+                  VIDA_UTIL       := System.int32(oActivosData.GetProperty('U_VidaUtil'));
+
+                  if (j > 0) then begin
+                     dec(j);
+                     ActivoAdicion := TActivoAdicion(LstActivoAdicion[j]);
+                  end;
+               end
+               else if (ActYear[i].AdicVid > 0) and (i <> nxPr) and (i > inicioActiv) then begin
+                  PERIODOS_DEPREC := PERIODOS_DEPREC + ActYear[i].PerDepre;
+                  VIDA_UTIL       := VIDA_UTIL       + ActYear[i].PerDepre;
+
+                  ActivoAdicion.VidaUtil             := VIDA_UTIL;
+                  ActivoAdicion.PeriodosDerpreciados := PERIODOS_DEPREC;
+                  ActivoAdicion.AdicVida             := ActYear[i].AdicVid;
+
+                  PERIODOS_DEPREC := 0;
+                  VIDA_UTIL       := VIDA_UTIL - ActYear[i].AdicVid;
+                  if (j > 0) then begin
+                     dec(j);
+                     ActivoAdicion := TActivoAdicion(LstActivoAdicion[j]);
+                  end;
+               end
+               else if (i = ActivoAdicion.PeriodoInicial) then begin
+                  if (i <> nxPr) then begin
+                     PERIODOS_DEPREC := PERIODOS_DEPREC + ActYear[i].PerDepre;
+                     VIDA_UTIL       := VIDA_UTIL       + ActYear[i].PerDepre;
+                  end;
+
+                  ActivoAdicion.VidaUtil             := VIDA_UTIL;
+                  ActivoAdicion.PeriodosDerpreciados := PERIODOS_DEPREC;
+                  ActivoAdicion.AdicVida             := ActYear[i].AdicVid;
+
+                  if (j > 0) then begin
+                     dec(j);
+                     ActivoAdicion := TActivoAdicion(LstActivoAdicion[j]);
+                  end;
+               end
+               else if (ActYear[i].DeprMes > 0) then begin
+                  if (i <> nxPr) then begin
+                     PERIODOS_DEPREC := PERIODOS_DEPREC + ActYear[i].PerDepre;
+                     VIDA_UTIL       := VIDA_UTIL       + ActYear[i].PerDepre;
+                  end;
+               end;
+            end;
+        
+// DEBUG
+if (System.String(oActivosData.GetProperty('Code')) = oLogCode) and (oLogMess) then begin
+   OutLog(' ');
+   OutLog(' ');
+   for i:=0 to LstActivoAdicion.Count-1 do begin
+      ActivoAdicion := TActivoAdicion(LstActivoAdicion[i]);
+      OutLog('i : ' + i.ToString);
+      OutLog('VidaUtil             : ' + ActivoAdicion.VidaUtil.ToString);
+      OutLog('PeriodosDerpreciados : ' + ActivoAdicion.PeriodosDerpreciados.ToString);
+      OutLog('AdicVida             : ' + ActivoAdicion.AdicVida.ToString);
+   end;
+end;
+
+            // Factor periodo inicial
+            if (nxYr = U_InitYear) then
+               indiceOri := Indices[U_InitPer]
+            else begin
+               indiceOri := Indices[0]; //indice año anterior
+               if (indiceOri = 0) then
+                  raise new exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Indices_no_definidos] + nxYr.ToString + '/' + nxPr.ToString)
+            end;
+        
+            ACT_VALOR_NOMINAL   := ADICIONES_TOTALES + U_OriValCo - U_OriDepre;
+            DEPREC_ANUAL_NOM    := 0;
+            DEPREC_PERIODO      := 0;
+            DEPREC_NOMINAL      := 0;
+            ACT_VALOR_CORREGIDO := 0;
+            ACT_DEPRE_CORREGIDA := 0;
+            DEPREC_ANUAL_TOTAL  := 0;
+        
+            for i:=inicioActiv to nxPr do begin
+               DEPREC_ANUAL_NOM := DEPREC_ANUAL_NOM + ActYear[i].DeprMes + ActYear[i].CorDepM;
+            end;
+        
+            for i:=0 to LstActivoAdicion.Count-1 do begin
+               ActivoAdicion := TActivoAdicion(LstActivoAdicion[i]);
+        
+               FactorIpc := AjustarDecimales(indices[nxPr] / indices[ActivoAdicion.PeriodoInicial]);
+               if (FactorIpc < 1) and (System.String(oParametrosData.GetProperty('U_CorPosit')).Trim = 'Y') and (nxPr = 12) then
+                  FactorIpc := 1;
+        
+               if (i = 0) then begin
+                  ActivoAdicion.ValorCorregidoDeprec := ActivoAdicion.ValorInicialDeprec * FactorIpc;
+                  ACT_DEPRE_CORREGIDA                := ActivoAdicion.ValorCorregidoDeprec
+               end;
+        
+               ActivoAdicion.ValorCorregidoActivo  := ActivoAdicion.ValorInicialActivo * FactorIpc;
+               ACT_VALOR_CORREGIDO                 := ACT_VALOR_CORREGIDO + ActivoAdicion.ValorCorregidoActivo;
+
+               // deprecia hasta adicion de vida util (de acuerdo a ingreso de adiciones de vida
+   { el periodo 0, aparecn perdiodos depreciados = 2, debiese ser 1
+     se debe restar al total o sumar revisar calculo
+   }
+               if (ActivoAdicion.VidaUtil > 0) then begin //IO
+
+if (System.String(oActivosData.GetProperty('Code')) = oLogCode) and (oLogMess) then begin
+      OutLog('i : ' + i.ToString);
+      OutLog('VidaUtil             : ' + ActivoAdicion.VidaUtil.ToString);
+      OutLog('PeriodosDerpreciados : ' + ActivoAdicion.PeriodosDerpreciados.ToString);
+      OutLog('ValorCorregidoActivo : ' + ActivoAdicion.ValorCorregidoActivo.ToString);
+      OutLog('ValorCorregidoDeprec : ' + ActivoAdicion.ValorCorregidoDeprec.ToString);
+
+      OutLog('');
+      OutLog('ActivoAdicion');
+      OutLog('ActivoAdicion AdicVida  ' + ActivoAdicion.AdicVida);
+      OutLog('ActivoAdicion PeriodoInicial  ' + ActivoAdicion.PeriodoInicial);
+      OutLog('ActivoAdicion PeriodosDerpreciados  ' + ActivoAdicion.PeriodosDerpreciados);
+      OutLog('ActivoAdicion ValorCorregidoActivo  ' + ActivoAdicion.ValorCorregidoActivo);
+      OutLog('ActivoAdicion ValorCorregidoDeprec  ' + ActivoAdicion.ValorCorregidoDeprec);
+      OutLog('ActivoAdicion ValorInicialActivo  ' + ActivoAdicion.ValorInicialActivo);
+      OutLog('ActivoAdicion ValorInicialDeprec  ' + ActivoAdicion.ValorInicialDeprec);
+      OutLog('ActivoAdicion VidaUtil  ' + ActivoAdicion.VidaUtil);
+      OutLog('');
+end;
+
+                  if (ActivoAdicion.AdicVida > 0) then begin
+                     DEPREC_PERIODO     := (ACT_VALOR_CORREGIDO-ACT_DEPRE_CORREGIDA-DEPREC_ANUAL_TOTAL) * U_PorResid * UNID_DEPREC/ ActivoAdicion.VidaUtil;
+                     DEPREC_ANUAL_TOTAL := DEPREC_ANUAL_TOTAL + (ACT_VALOR_CORREGIDO-ACT_DEPRE_CORREGIDA-DEPREC_ANUAL_TOTAL) * U_PorResid * ActivoAdicion.PeriodosDerpreciados / ActivoAdicion.VidaUtil;
+                  end
+                  else begin
+                     if (ActivoAdicion.PeriodosDerpreciados > 0) then
+                        DEPREC_PERIODO     := DEPREC_PERIODO + (ActivoAdicion.ValorCorregidoActivo-ActivoAdicion.ValorCorregidoDeprec) * U_PorResid * UNID_DEPREC / ActivoAdicion.VidaUtil;
+                     DEPREC_ANUAL_TOTAL := DEPREC_ANUAL_TOTAL + (ActivoAdicion.ValorCorregidoActivo-ActivoAdicion.ValorCorregidoDeprec) * U_PorResid * ActivoAdicion.PeriodosDerpreciados / ActivoAdicion.VidaUtil;
+                  end;
+if (System.String(oActivosData.GetProperty('Code')) = oLogCode) and (oLogMess) then begin
+      OutLog('RDEPREC_ANUAL_TOTAL  : ' + DEPREC_ANUAL_TOTAL.ToString);
+      OutLog('RDEPREC_PERIODO      : ' + DEPREC_PERIODO.ToString);
+      OutLog('RACT_VALOR_CORREGIDO : ' + ACT_VALOR_CORREGIDO.ToString);
+end;
+               end;
+            end;
+
+            ActivoAdicion     := TActivoAdicion(LstActivoAdicion[0]);
+        
+            ACT_VALOR_NOMINAL := ADICIONES_TOTALES + U_OriValCo - U_OriDepre;
+            VIDA_UTIL         := System.Int32(oActivosData.GetProperty('U_VidaUtil'));
+            if (VIDA_UTIL > 0) and (DEPREC_PERIODO > 0) then
+               DEPREC_NOMINAL := (ACT_VALOR_NOMINAL - System.Double(oActivosData.GetProperty('U_DepAcumN'))) * U_PorResid * UNID_DEPREC / VIDA_UTIL;
+        
+            CorrActi     := ACT_VALOR_CORREGIDO - U_CurVal - U_CorAnuAc - ADICIONES_ANUALES;
+            CorrDepr     := ActivoAdicion.ValorCorregidoDeprec - U_DepAcum - U_CorAnuDe;
+            NvoValActivo := ACT_VALOR_CORREGIDO;
+            CorrDeprM    := DEPREC_ANUAL_TOTAL - DEPREC_PERIODO - DEPREC_ANUAL_NOM;
+        
+            // Depreciacion del mes
+            perDep    := 0;
+            if (Deprecia_Flag) then begin
+               if (VIDA_UTIL > 0) then
+                  perDep   := UNID_DEPREC
+               else begin
+                  DEPREC_PERIODO := 0;
+                  DEPREC_NOMINAL := 0;
+               end;
+            end
+            else begin
+               DEPREC_PERIODO := 0;
+               DEPREC_NOMINAL := 0;
+            end;
+        
+            VALOR_RESIDUAL := 0;
+            if (U_PerVidaU + ActYear[nxPr].AdicVid <= U_PerDepre) or (U_PerVidaU <= 0) then begin
+               //Detener correcciones
+               if (System.String(oParametrosData.GetProperty('U_CorActDe')).Trim <> 'Y') then begin
+                  CorrActi  := 0;
+                  CorrDepr  := 0;
+                  CorrDeprM := 0;
+               end;
+        
+               if (U_PorResid = 0) then
+                  VALOR_RESIDUAL := System.Double(oParametrosData.GetProperty('U_ValResid'));
+            end;
+        
+            s := 'N';
+            oActivosLines     := oActivosData.Child('VID_AFAC');
+            oActivosLinesData := oActivosLines.Add;
+            oActivosLinesData.SetProperty('U_Year'    , nxYr);
+            oActivosLinesData.SetProperty('U_Periodo' , nxPr);
+            oActivosLinesData.SetProperty('U_CorrActi', CorrActi);
+            oActivosLinesData.SetProperty('U_CorrDepr', CorrDepr);
+            oActivosLinesData.SetProperty('U_Deprecia', DEPREC_PERIODO);
+            oActivosLinesData.SetProperty('U_CorrDepM', CorrDeprM);
+            oActivosLinesData.SetProperty('U_DeprNom' , DEPREC_NOMINAL);
+            oActivosLinesData.SetProperty('U_Adicion' , ActYear[nxPr].AdicVal);
+            oActivosLinesData.SetProperty('U_PerVidUt', ActYear[nxPr].AdicVid);
+            oActivosLinesData.SetProperty('U_PerDepre', perDep);
+            oActivosLinesData.SetProperty('U_PostFlag', s);
+        
+            //............. Anual..........
+        
+            if (nxPr = 12) then begin
+               nxYrIns := nxYr + 1;
+               nxPrIns := 1;
+            end
+            else begin
+               nxYrIns := nxYr;
+               nxPrIns := nxPr + 1;
+            end;
+        
+            U_CorAnuAc := CorrActi + U_CorAnuAc;
+            U_CorAnuDe := CorrDepr + U_CorAnuDe;
+            if (nxPrIns = 1) then begin
+               // actualizo información anual
+
+               // Determinar uso de Bis33
+               Bis33_flag := false;
+               if (System.String(oActivosData.GetProperty('U_Bis33Flg')) = 'Y') and (System.String(oParametrosData.GetProperty('U_Bis33Flg'))  = 'Y') and (System.String(oParametrosData.GetProperty('U_Bis33Fin'))  = 'Y') then
+                  Bis33_flag := true;
+        
+               // Solo a fin de año de calcula Bis33
+               Ley33Bis := 0;
+               if (nxPr = 12) and (nxYr = U_OriFec.Year)  and (Bis33_flag) and (TopeLey33Bis  > 0) then begin
+                  Ley33Bis     := NvoValActivo * ( System.Double( oParametrosData.GetProperty('U_Bis33Per')) / 100);
+                  if (Ley33Bis > TopeLey33Bis) then begin
+                     Ley33Bis := TopeLey33Bis;
+                     TopeLey33Bis := 0;
+                  end
+                  else 
+                     TopeLey33Bis := TopeLey33Bis - Ley33Bis;
+                  if (System.String(oActivosData.GetProperty('U_Bis33Aju')) = 'Y') then begin
+                     FactorBis33 := Ley33Bis / NvoValActivo;
+                     DEPREC_PERIODO := DEPREC_PERIODO - (DEPREC_PERIODO + DEPREC_ANUAL_NOM + CorrDeprM)*FactorBis33;
+                  end;
+               end;
+               
+               // Ajuste Bis 33
+
+               oActivosLinesData.SetProperty('U_Deprecia', DEPREC_PERIODO);
+
+               oActivosLines     := oActivosData.Child('VID_AFSA');
+               oActivosLinesData := oActivosLines.Add;
+               oActivosLinesData.SetProperty('U_Year'     , nxYr);
+               oActivosLinesData.SetProperty('U_CurVal'   , U_CurVal);
+               oActivosLinesData.SetProperty('U_CorAnuAc' , U_CorAnuAc);
+               oActivosLinesData.SetProperty('U_DepAcum'  , U_DepAcum);
+               oActivosLinesData.SetProperty('U_DepAnual' , DEPREC_PERIODO + DEPREC_ANUAL_NOM + CorrDeprM);
+               oActivosLinesData.SetProperty('U_DepAcumN' , DEPREC_NOMINAL + U_DepAcumN );
+               oActivosLinesData.SetProperty('U_CorAnuDe' , U_CorAnuDe);
+               oActivosLinesData.SetProperty('U_Adicion'  , ADICIONES_ANUALES);
+               oActivosLinesData.SetProperty('U_Bis33'    , Ley33Bis);
+            end;
+        
+            oActivosData.SetProperty('U_CorAnuAc',  U_CorAnuAc );
+            oActivosData.SetProperty('U_DepreAnu',  System.Double( oActivosData.GetProperty('U_DepreAnu')) + DEPREC_PERIODO + CorrDeprM );
+            oActivosData.SetProperty('U_DepAcumN',  System.Double( oActivosData.GetProperty('U_DepAcumN')) + DEPREC_NOMINAL);
+            oActivosData.SetProperty('U_AdicAnuC',  ADICIONES_ANUALES);
+            oActivosData.SetProperty('U_CorAnuDe',  U_CorAnuDe );
+            oActivosData.SetProperty('U_PerVidaU',  System.Int32( oActivosData.GetProperty('U_PerVidaU')) + ActYear[nxPr].AdicVid );
+            oActivosData.SetProperty('U_VidaUtil',  System.Int32( oActivosData.GetProperty('U_VidaUtil')) - perDep + ActYear[nxPr].AdicVid );
+            oActivosData.SetProperty('U_PerDepre',  System.Int32( oActivosData.GetProperty('U_PerDepre')) + perDep );
+            oActivosData.SetProperty('U_PerDepYr',  System.Int32( oActivosData.GetProperty('U_PerDepYr')) + perDep );
+            oActivosData.SetProperty('U_Bis33Fin',  Ley33Bis );
+
+            oActivosData.SetProperty('U_NextYear',  nxYrIns );
+            oActivosData.SetProperty('U_NextPer' ,  nxPrIns );
+            oActivosData.SetProperty('U_ValResid',  VALOR_RESIDUAL );
+        
+   finally
+//      FSBOf._ReleaseCOMObject(oActivosLines);
+//      FSBOf._ReleaseCOMObject(oActivosLinesData);
+//      FSBOf._ReleaseCOMObject(oRecordActividad);
+   end;
+end;
+
+method TProcesoAF.ProcesoReferencial(var oActivosData, oParametrosData, oActivosLinesData: SAPbobsCOM.GeneralData; var oActivosLines: SAPbobsCOM.GeneralDataCollection; var oRecordActividad: SAPbobsCOM.RecordSet; Indices: TIndice; nxYr, nxPr: integer; var TopeLey33Bis: Double);
+var
+   indiceOri    : double;
+   FactorIpc    : double;
+   FactorBis33  : double;
+   Corrige_Flag : boolean;
+   Bis33_flag   : boolean;
+
+   ActYearR          : array [0..12] of TActividaMensual;
+   LstActivoAdicionR : List<TActivoAdicion>;
+   ActivoAdicion     : TActivoAdicion;
+//   AdicionVida       : TAdicionVida;
+   i, j              : integer;
+
+   U_NextYear : integer;
+   U_NextPer  : integer;
+   U_NxYrDepr : integer;
+   U_NxPrDepr : integer;
+   U_InitYear : integer;
+   U_InitPer  : integer;
+   U_Bis33    : double;
+   U_Orifec   : DateTime;
+   U_PorResid : double;
+
+   U_OriValCR : double;
+   U_OriDeprR : Double;
+   U_CurValR  : double;
+   U_DepAcuR  : double;
+   U_DepAcuRN : double;
+   U_CorAnuAR : double;
+   U_CorAnuDR : double;
+   U_DepreAnR : double;
+   U_PRrDepre : integer;
+   U_PRrDepYr : integer;
+   U_PerVidaR : integer;
+   U_AdicAnuR : double;
+
+   VALOR_RESIDUAL      : double;
+   ADICIONES_TOTALES   : double;
+   ADICIONES_ANUALES   : double;
+
+   RACT_VALOR_NOMINAL   : double;
+   RACT_VALOR_CORREGIDO : double;
+   RACT_DEPRE_CORREGIDA : double;
+   RDEPREC_NOMINAL      : double;
+   RDEPREC_ANUAL_TOTAL  : double;
+   RDEPREC_PERIODO      : double;
+   RDEPREC_ANUAL_NOM    : double;
+   RPERIODOS_DEPREC     : integer;
+   RVIDA_UTIL           : integer;
+   RUNID_DEPREC         : Integer;
+
+   RNvoValActivo        : double;
+   RCorrActi            : double;
+   RCorrDepr            : double;
+   RCorrDeprM           : double;
+   RPerDep              : integer;
+   RDeprecia_Flag       : boolean;
+   RinicioActiv         : integer;
+
+   Ley33Bis           : double;
+
+   s:                 string;
+   nxYrIns, nxPrIns:  integer;
+begin
+   try
+      LstActivoAdicionR := New List<TActivoAdicion>;
+            // valores actuales del activo
+        
+            U_NextYear := System.Int32(oActivosData.GetProperty('U_NextYear'));
+            U_NextPer  := System.Int32(oActivosData.GetProperty('U_NextPer' ));
+            U_NxYrDepr := System.Int32(oActivosData.GetProperty('U_NxYrDepr'));
+            U_NxPrDepr := System.Int32(oActivosData.GetProperty('U_NxPrDepr'));
+            U_InitYear := System.Int32(oActivosData.GetProperty('U_InitYear'));
+            U_InitPer  := System.Int32(oActivosData.GetProperty('U_InitPer' ));
+            U_Bis33    := System.Double(oActivosData.GetProperty('U_Bis33'   ));
+            U_OriFec   := System.DateTime(oActivosData.GetProperty('U_OriFec'));
+            U_PorResid := 1-System.Double(oActivosData.GetProperty('U_PorResid'))/100;
+        
+            U_OriValCR := System.Double(oActivosData.GetProperty('U_OriValCR'));    //  ANT_VALOR_ORIGINAL
+            U_OriDeprR := System.Double(oActivosData.GetProperty('U_OriDeprR'));    //  ANT_DEPRECIACION_ORIGINAL
+            U_CurValR  := System.Double(oActivosData.GetProperty('U_CurValR' ));    //  ANT_VALOR_ACTUAL
+            U_DepAcuR  := System.Double(oActivosData.GetProperty('U_DepAcuR' ));    //  ANT_DEPRACUMULADA
+            U_DepAcuRN := System.Double(oActivosData.GetProperty('U_DepAcuRN'));    //
+            U_CorAnuAR := System.Double(oActivosData.GetProperty('U_CorAnuAR'));    //  ANT_CORRANUALACTIVO
+            U_CorAnuDR := System.Double(oActivosData.GetProperty('U_CorAnuDR'));    //  ANT_CORRANUALDEPR
+            U_DepreAnR := System.Double(oActivosData.GetProperty('U_DepreAnR'));    //  ANT_DEPRANUAL
+            U_PRrDepre := System.Int32(oActivosData.GetProperty ('U_PRrDepre'));    //  ANT_PERDEPRECIADOS
+            U_PRrDepYr := System.Int32(oActivosData.GetProperty ('U_PRrDepYr'));    //  ANT_PERDEPRECYEAR
+            U_PerVidaR := System.Int32(oActivosData.GetProperty ('U_PerVidaR'));    //  ANT_VIDAUTIL
+            U_AdicAnuR := System.double(oActivosData.GetProperty('U_AdicAnuR'));    //  ANT_ADIC_ANUCORR
+                
+            // Actualiza VID_AFAS
+            if (nxPr = 1) then begin
+               U_CurValR  := U_CurValR + U_CorAnuAR + U_AdicAnuR;
+               U_DepAcuR  := U_DepAcuR + U_CorAnuDR + U_DepreAnR + U_Bis33;
+               U_CorAnuAR := 0;
+               U_DepreAnR := 0;
+               U_AdicAnuR := 0;
+               U_CorAnuDR := 0;
+               U_PRrDepYr := 0;
+        
+               oActivosData.SetProperty('U_PRrDepYr', U_PRrDepYr );
+               oActivosData.SetProperty('U_CurValR' , U_CurValR  );
+               oActivosData.SetProperty('U_DepAcuR' , U_DepAcuR  );
+               oActivosData.SetProperty('U_CorAnuAR', U_CorAnuAR );
+               oActivosData.SetProperty('U_DepreAnR', U_DepreAnR );
+               oActivosData.SetProperty('U_AdicAnuR', U_AdicAnuR );
+               oActivosData.SetProperty('U_CorAnuDR', U_CorAnuDR );
+            end;
+        
+            for j:=0 to 12 do begin
+               ActYearR[j] := new TActividaMensual;
+               if (j=0) then begin
+                  ActYearR[j].Year      := nxYr-1;
+                  ActYearR[j].Per       := 12;
+               end
+               else begin
+                  ActYearR[j].Year      := nxYr;
+                  ActYearR[j].Per       := j;
+               end;
+               ActYearR[j].CorrAct   := 0;
+               ActYearR[j].CorrDep   := 0;
+               ActYearR[j].DeprMes   := 0;
+               ActYearR[j].DeprNoAct := 0;
+               ActYearR[j].CorDepM   := 0;
+               ActYearR[j].AdicVal   := 0;
+               ActYearR[j].AdicVid   := 0;
+               ActYearR[j].PerDepre  := 0;
+            end;
+        
+            if (U_InitYear <> nxYr) then
+               RinicioActiv := 0
+            else
+               RinicioActiv := U_InitPer;
+        
+            // insertar adiciones de la misma fecha de ingreso del activo
+            //... Marcar ... VID_AFAD para el periodo como procesado
+            ADICIONES_TOTALES := 0;
+            ADICIONES_ANUALES := 0;
+            oActivosLines     := oActivosData.Child('VID_AFAD');
+            for i:=0 to oActivosLines.Count - 1 do begin
+               oActivosLinesData := oActivosLines.Item(i);
+                  // si U_Procesad esta en 'Y' de proceso normal, continuar
+               if ((System.Int32(oActivosLinesData.GetProperty('U_Year')) <> nxYr) or (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) <> nxPr)) and (System.String(oActivosLinesData.GetProperty('U_Procesad')) = 'Y') then begin
+                  ADICIONES_TOTALES := ADICIONES_TOTALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+                  if (System.Int32(oActivosLinesData.GetProperty('U_Year')) = nxYr) then
+                     ADICIONES_ANUALES := ADICIONES_ANUALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+               end;
+        
+               if (System.Int32(oActivosLinesData.GetProperty('U_Year')) <> nxYr) or (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) <> nxPr) then
+                  Continue
+               else begin
+                  s := 'Y';
+                  oActivosLinesData.SetProperty('U_Procesad', s);
+                  ADICIONES_TOTALES := ADICIONES_TOTALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+                  ADICIONES_ANUALES := ADICIONES_ANUALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+        
+                  ActYearR[nxPr].AdicVal := ActYearR[nxPr].AdicVal + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+                  if (System.String(oParametrosData.GetProperty('U_AdicVdUt')).Trim = 'Y') then
+                     ActYearR[nxPr].AdicVid := ActYearR[nxPr].AdicVid + System.Int32(oActivosLinesData.GetProperty('U_PerVidUt'));
+               end;
+            end;
+        
+            // Determinar si debe depreciarse o solo corregirse
+        
+            RDeprecia_Flag := False;
+            Corrige_Flag   := True;
+            if (System.String(oActivosData.GetProperty('U_ConDepre')) = 'Y') and ((nxYr > U_NxYrDepr) or ((nxYr = U_NxYrDepr) and (nxPr >= U_NxPrDepr))) then begin
+               RDeprecia_Flag := true;
+            end;
+        
+            RUNID_DEPREC := 0;
+            if (System.String(oActivosData.GetProperty('U_TipoDepR')) = 'U') then begin
+               s := "select isnull(d.U_Uso,0) Uso " +
+                    "  from [@VID_AFUS] h inner join [@VID_AFUSD] d on h.DocEntry = d.DocEntry " +
+                    " where h.U_Year    = " + nxYr.ToString +
+                    "   and h.U_Periodo = " + nxPr.ToString +
+                    "   and d.U_ActCode = " + TMultiFunctions.QuotedStr(System.String(oActivosData.GetProperty('U_ActCode'))) ;
+                oRecordActividad.DoQuery(s);
+                if (not oRecordActividad.EoF) then
+                   RUNID_DEPREC := System.Int32(oRecordActividad.Fields.Item('Uso').Value);
+             end
+             else 
+                RUNID_DEPREC := 1;
+
+            s := 'Select U_Year, U_Periodo, U_CorrActi, U_CorrDepr, U_Deprecia, U_CorrDepM, U_Adicion, U_DeprNom, U_PerVidUt, U_PerDepre ' +
+                 '  from [@VID_AFACR] ' +
+                 ' where code = ' + TMultiFunctions.QuotedStr(System.String(oActivosData.GetProperty('Code'))) +
+                 '   and U_Year = ' + nxYr.ToString +
+                 ' order by U_Periodo ';
+            oRecordActividad.DoQuery(s);
+        
+            LstActivoAdicionR.Clear;
+            ActivoAdicion := new  TActivoAdicion;
+            InitActivoAdicion(var ActivoAdicion);
+            LstActivoAdicionR.Add(ActivoAdicion);
+        
+            //ActivoAdicion del periodo 0 o periodo de ingreso del activo
+            ActivoAdicion.PeriodoInicial       := RinicioActiv;
+            if (RinicioActiv = 0) then begin
+               ActivoAdicion.ValorInicialActivo   := U_CurValR;
+               ActivoAdicion.ValorInicialDeprec   := U_DepAcuR;
+               ActivoAdicion.ValorCorregidoActivo := U_CurValR;
+               ActivoAdicion.ValorCorregidoDeprec := U_DepAcuR;
+            end
+            else begin
+               ActivoAdicion.ValorInicialActivo   := U_CurValR + ActYearR[RinicioActiv].AdicVal;
+               ActivoAdicion.ValorInicialDeprec   := U_DepAcuR;
+               ActivoAdicion.ValorCorregidoActivo := U_CurValR + ActYearR[RinicioActiv].AdicVal;
+               ActivoAdicion.ValorCorregidoDeprec := U_DepAcuR;
+            end;
+        
+            // Los activos con actvidad mensual
+            i := System.Int32 (oRecordActividad.Fields.Item('U_Periodo' ).value);
+            while (not oRecordActividad.EoF)  do begin
+               ActYearR[i].Year      := nxYr;
+               ActYearR[i].Per       := System.Int32 (oRecordActividad.Fields.Item('U_Periodo' ).value);
+               ActYearR[i].CorrAct   := System.Double(oRecordActividad.Fields.Item('U_CorrActi').value);
+               ActYearR[i].CorrDep   := System.Double(oRecordActividad.Fields.Item('U_CorrDepr').value);
+               ActYearR[i].DeprMes   := System.Double(oRecordActividad.Fields.Item('U_Deprecia').value);
+               ActYearR[i].DeprNoAct := System.Double(oRecordActividad.Fields.Item('U_DeprNom' ).value);
+               ActYearR[i].CorDepM   := System.Double(oRecordActividad.Fields.Item('U_CorrDepM').value);
+               ActYearR[i].AdicVal   := System.Double(oRecordActividad.Fields.Item('U_Adicion' ).value);
+               ActYearR[i].AdicVid   := System.Int32(oRecordActividad.Fields.Item('U_PerVidUt').value);
+               ActYearR[i].PerDepre  := System.Int32(oRecordActividad.Fields.Item('U_PerDepre').value);
+        
+               // Ingreso de adiciones si existen
+               if (ActYearR[i].AdicVal > 0) then begin
+                  if (i = RinicioActiv) then
+                     ActivoAdicion.ValorInicialActivo := U_CurValR  + ActYearR[i].AdicVal
+                  else begin
+                     ActivoAdicion := new TActivoAdicion;
+                     InitActivoAdicion(var ActivoAdicion);
+                     LstActivoAdicionR.Add(ActivoAdicion);
+        
+                     ActivoAdicion.PeriodoInicial := i;
+                     ActivoAdicion.ValorInicialActivo   := ActYearR[i].AdicVal;
+                  end;
+               end;
+        
+               inc(i);
+               oRecordActividad.MoveNext;
+            end;
+
+            // ingreso adiciones del periodo en proceso
+            if (ActYearR[nxPr].AdicVal > 0) and (nxPr <> RinicioActiv) then begin
+               ActivoAdicion := new TActivoAdicion;
+               InitActivoAdicion(var ActivoAdicion);
+               LstActivoAdicionR.Add(ActivoAdicion);
+        
+               ActivoAdicion.PeriodoInicial := nxPr;
+               ActivoAdicion.ValorInicialActivo   := ActYearR[nxPr].AdicVal;
+            end;
+        
+            // Calculos de valores de adiciones
+            RVIDA_UTIL       := System.int32(oActivosData.GetProperty('U_VidaUtiR'));
+            if (RUNID_DEPREC > RVIDA_UTIL) then
+               RUNID_DEPREC := RVIDA_UTIL;
+            RPERIODOS_DEPREC := RUNID_DEPREC;
+
+            j := LstActivoAdicionR.Count-1;
+            ActivoAdicion := TActivoAdicion(LstActivoAdicionR[j]);
+            for i:=nxPr downto RinicioActiv do begin
+               if (ActYearR[i].AdicVid > 0) and (i = nxPr) then begin   
+                  ActivoAdicion.VidaUtil   := RVIDA_UTIL + ActYearR[i].AdicVid;
+                  ActivoAdicion.AdicVida   := ActYearR[i].AdicVid;
+                  if (RDeprecia_Flag) then
+                     ActivoAdicion.PeriodosDerpreciados := RPERIODOS_DEPREC
+                  else
+                     ActivoAdicion.PeriodosDerpreciados := 0;
+
+                  RPERIODOS_DEPREC := 0;
+                  RVIDA_UTIL       := System.int32(oActivosData.GetProperty('U_VidaUtiR'));
+
+                  if (j > 0) then begin
+                     dec(j);
+                     ActivoAdicion := TActivoAdicion(LstActivoAdicionR[j]);
+                  end;
+               end
+               else if (ActYearR[i].AdicVid > 0) and (i <> nxPr) and (i > RinicioActiv) then begin
+                  RPERIODOS_DEPREC := RPERIODOS_DEPREC + ActYearR[i].PerDepre;
+                  RVIDA_UTIL       := RVIDA_UTIL       + ActYearR[i].PerDepre;
+
+                  ActivoAdicion.VidaUtil             := RVIDA_UTIL;
+                  ActivoAdicion.PeriodosDerpreciados := RPERIODOS_DEPREC;
+                  ActivoAdicion.AdicVida             := ActYearR[i].AdicVid;
+
+                  RPERIODOS_DEPREC := 0;
+                  RVIDA_UTIL       := RVIDA_UTIL - ActYearR[i].AdicVid;
+                  if (j > 0) then begin
+                     dec(j);
+                     ActivoAdicion := TActivoAdicion(LstActivoAdicionR[j]);
+                  end;
+               end
+               else if (i = ActivoAdicion.PeriodoInicial) then begin
+                  if (i <> nxPr) then begin
+                     RPERIODOS_DEPREC := RPERIODOS_DEPREC + ActYearR[i].PerDepre;
+                     RVIDA_UTIL       := RVIDA_UTIL       + ActYearR[i].PerDepre;
+                  end;
+
+                  ActivoAdicion.VidaUtil             := RVIDA_UTIL;
+                  ActivoAdicion.PeriodosDerpreciados := RPERIODOS_DEPREC;
+                  ActivoAdicion.AdicVida             := ActYearR[i].AdicVid;
+
+                  if (j > 0) then begin
+                     dec(j);
+                     ActivoAdicion := TActivoAdicion(LstActivoAdicionR[j]);
+                  end;
+               end
+               else if (ActYearR[i].DeprMes > 0) then begin
+                  if (i <> nxPr) then begin
+                     RPERIODOS_DEPREC := RPERIODOS_DEPREC + ActYearR[i].PerDepre;
+                     RVIDA_UTIL       := RVIDA_UTIL       + ActYearR[i].PerDepre;
+                  end;
+               end;
+            end;
+        
+// DEBUG
+if (System.String(oActivosData.GetProperty('Code')) = oLogCode) and (oLogMess) then begin
+   OutLog(' ');
+   OutLog(' ');
+   for i:=0 to LstActivoAdicionR.Count-1 do begin
+      ActivoAdicion := TActivoAdicion(LstActivoAdicionR[i]);
+      OutLog('i : ' + i.ToString);
+      OutLog('VidaUtil             : ' + ActivoAdicion.VidaUtil.ToString);
+      OutLog('PeriodosDerpreciados : ' + ActivoAdicion.PeriodosDerpreciados.ToString);
+      OutLog('AdicVida             : ' + ActivoAdicion.AdicVida.ToString);
+   end;
+end;
+
+            // Factor periodo inicial
+            if (nxYr = U_InitYear) then
+               indiceOri := Indices[U_InitPer]
+            else begin
+               indiceOri := Indices[0]; //indice año anterior
+               if (indiceOri = 0) then
+                  raise new exception(GlobalSettings.APP_MESSAGE[GlobalSettings.APP_Message_Arr, GlobalSettings.APP_Message_id.Indices_no_definidos] + nxYr.ToString + '/' + nxPr.ToString)
+            end;
+        
+            RACT_VALOR_NOMINAL   := ADICIONES_TOTALES + U_OriValCR - U_OriDeprR;
+            RDEPREC_ANUAL_NOM    := 0;
+            RDEPREC_PERIODO      := 0;
+            RDEPREC_NOMINAL      := 0;
+            RACT_VALOR_CORREGIDO := 0;
+            RACT_DEPRE_CORREGIDA := 0;
+            RDEPREC_ANUAL_TOTAL  := 0;
+        
+            for i:=RinicioActiv to nxPr do begin
+               RDEPREC_ANUAL_NOM := RDEPREC_ANUAL_NOM + ActYearR[i].DeprMes + ActYearR[i].CorDepM;
+            end;
+        
+            for i:=0 to LstActivoAdicionR.Count-1 do begin
+               ActivoAdicion := TActivoAdicion(LstActivoAdicionR[i]);
+        
+               FactorIpc := AjustarDecimales(indices[nxPr] / indices[ActivoAdicion.PeriodoInicial]);
+               if (FactorIpc < 1) and (System.String(oParametrosData.GetProperty('U_CorPosit')).Trim = 'Y') and (nxPr = 12) then
+                  FactorIpc := 1;
+        
+               if (i = 0) then begin
+                  ActivoAdicion.ValorCorregidoDeprec := ActivoAdicion.ValorInicialDeprec * FactorIpc;
+                  RACT_DEPRE_CORREGIDA               := ActivoAdicion.ValorCorregidoDeprec
+               end;
+        
+               ActivoAdicion.ValorCorregidoActivo  := ActivoAdicion.ValorInicialActivo * FactorIpc;
+               RACT_VALOR_CORREGIDO                := RACT_VALOR_CORREGIDO + ActivoAdicion.ValorCorregidoActivo;
+
+               // deprecia hasta adicion de vida util (de acuerdo a ingreso de adiciones de vida
+   { el periodo 0, aparecn perdiodos depreciados = 2, debiese ser 1
+     se debe restar al total o sumar revisar calculo
+   }
+               if (ActivoAdicion.VidaUtil > 0) then begin //IO
+
+if (System.String(oActivosData.GetProperty('Code')) = oLogCode) and (oLogMess) then begin
+      OutLog('i : ' + i.ToString);
+      OutLog('VidaUtil             : ' + ActivoAdicion.VidaUtil.ToString);
+      OutLog('PeriodosDerpreciados : ' + ActivoAdicion.PeriodosDerpreciados.ToString);
+      OutLog('ValorCorregidoActivo : ' + ActivoAdicion.ValorCorregidoActivo.ToString);
+      OutLog('ValorCorregidoDeprec : ' + ActivoAdicion.ValorCorregidoDeprec.ToString);
+end;
+
+                  if (ActivoAdicion.AdicVida > 0) then begin
+                     RDEPREC_PERIODO     := (RACT_VALOR_CORREGIDO-RACT_DEPRE_CORREGIDA-RDEPREC_ANUAL_TOTAL) * U_PorResid * RUNID_DEPREC / ActivoAdicion.VidaUtil;
+                     RDEPREC_ANUAL_TOTAL := RDEPREC_ANUAL_TOTAL + (RACT_VALOR_CORREGIDO-RACT_DEPRE_CORREGIDA-RDEPREC_ANUAL_TOTAL) * U_PorResid * ActivoAdicion.PeriodosDerpreciados / ActivoAdicion.VidaUtil;
+                  end
+                  else begin
+                     if (ActivoAdicion.PeriodosDerpreciados > 0) then
+                        RDEPREC_PERIODO     := RDEPREC_PERIODO + (ActivoAdicion.ValorCorregidoActivo-ActivoAdicion.ValorCorregidoDeprec) * U_PorResid * RUNID_DEPREC / ActivoAdicion.VidaUtil;
+                     RDEPREC_ANUAL_TOTAL := RDEPREC_ANUAL_TOTAL + (ActivoAdicion.ValorCorregidoActivo-ActivoAdicion.ValorCorregidoDeprec) * U_PorResid * ActivoAdicion.PeriodosDerpreciados / ActivoAdicion.VidaUtil;
+                  end;
+if (System.String(oActivosData.GetProperty('Code')) = oLogCode) and (oLogMess) then begin
+      OutLog('RDEPREC_ANUAL_TOTAL  : ' + RDEPREC_ANUAL_TOTAL.ToString);
+      OutLog('RDEPREC_PERIODO      : ' + RDEPREC_PERIODO.ToString);
+      OutLog('RACT_VALOR_CORREGIDO : ' + RACT_VALOR_CORREGIDO.ToString);
+end;
+               end;
+            end;
+        
+            ActivoAdicion := TActivoAdicion(LstActivoAdicionR[0]);
+            
+            RACT_VALOR_NOMINAL   := ADICIONES_TOTALES + U_OriValCR - U_OriDeprR;
+            RVIDA_UTIL := System.Int32(oActivosData.GetProperty('U_VidaUtiR'));
+            if (RVIDA_UTIL > 0) and (RDEPREC_PERIODO > 0) then
+               RDEPREC_NOMINAL := (RACT_VALOR_NOMINAL - System.Double(oActivosData.GetProperty('U_DepAcuRN'))) * U_PorResid * RUNID_DEPREC / RVIDA_UTIL;
+        
+            RCorrActi     := RACT_VALOR_CORREGIDO - U_CurValR - U_CorAnuAR - ADICIONES_ANUALES;
+            RCorrDepr     := ActivoAdicion.ValorCorregidoDeprec - U_DepAcuR - U_CorAnuDR;
+            RNvoValActivo := RACT_VALOR_CORREGIDO;
+            RCorrDeprM    := RDEPREC_ANUAL_TOTAL - RDEPREC_PERIODO - RDEPREC_ANUAL_NOM;
+        
+            // Depreciacion del mes
+            RperDep    := 0;
+            if (RDeprecia_Flag) then begin
+               if (RVIDA_UTIL > 0) then
+                  RperDep   := RUNID_DEPREC
+               else begin
+                  RDEPREC_PERIODO := 0;
+                  RDEPREC_NOMINAL := 0;
+               end;
+            end
+            else begin
+               RDEPREC_PERIODO := 0;
+               RDEPREC_NOMINAL := 0;
+            end;
+        
+            VALOR_RESIDUAL := 0;
+            if (U_PerVidaR + ActYearR[nxPr].AdicVid <= U_PRrDepre) or (U_PerVidaR <= 0) then begin
+               //Detener correcciones
+               if (System.String(oParametrosData.GetProperty('U_CorActDe')).Trim <> 'Y') then begin
+                  RCorrActi  := 0;
+                  RCorrDepr  := 0;
+                  RCorrDeprM := 0;
+               end;
+            end;
+        
+            s := 'N';
+            oActivosLines     := oActivosData.Child('VID_AFACR');
+            oActivosLinesData := oActivosLines.Add;
+            oActivosLinesData.SetProperty('U_Year'    , nxYr);
+            oActivosLinesData.SetProperty('U_Periodo' , nxPr);
+            oActivosLinesData.SetProperty('U_CorrActi', RCorrActi);
+            oActivosLinesData.SetProperty('U_CorrDepr', RCorrDepr);
+            oActivosLinesData.SetProperty('U_Deprecia', RDEPREC_PERIODO);
+            oActivosLinesData.SetProperty('U_CorrDepM', RCorrDeprM);
+            oActivosLinesData.SetProperty('U_DeprNom' , RDEPREC_NOMINAL);
+            oActivosLinesData.SetProperty('U_Adicion' , ActYearR[nxPr].AdicVal);
+            oActivosLinesData.SetProperty('U_PerVidUt', ActYearR[nxPr].AdicVid);
+            oActivosLinesData.SetProperty('U_PerDepre', RperDep);
+            oActivosLinesData.SetProperty('U_PostFlag', s);
+        
+            //............. Anual..........
+        
+            if (nxPr = 12) then begin
+               nxYrIns := nxYr + 1;
+               nxPrIns := 1;
+            end
+            else begin
+               nxYrIns := nxYr;
+               nxPrIns := nxPr + 1;
+            end;
+                
+            U_CorAnuAR := RCorrActi + U_CorAnuAR;
+            U_CorAnuDR := RCorrDepr + U_CorAnuDR;
+        
+            if (nxPrIns = 1) then begin
+               // actualizo información anual
+        
+               // Determinar uso de Bis33
+               Bis33_flag := false;
+               if (System.String(oActivosData.GetProperty('U_Bis33Flg')) = 'Y') and (System.String(oParametrosData.GetProperty('U_Bis33Flg'))  = 'Y') and (System.String(oParametrosData.GetProperty('U_Bis33Ref'))  = 'Y') then
+                  Bis33_flag := true;
+        
+               // Solo a fin de año de calcula Bis33
+               Ley33Bis := 0;
+               if (nxPr = 12) and (nxYr = U_OriFec.Year)  and (Bis33_flag) and (TopeLey33Bis  > 0) then begin
+                  Ley33Bis     := RNvoValActivo * ( System.Double( oParametrosData.GetProperty('U_Bis33Per')) / 100);
+                  if (Ley33Bis > TopeLey33Bis) then begin
+                     Ley33Bis := TopeLey33Bis;
+                     TopeLey33Bis := 0;
+                  end
+                  else 
+                     TopeLey33Bis := TopeLey33Bis - Ley33Bis;
+                  if (System.String(oActivosData.GetProperty('U_Bis33Aju')) = 'Y') then begin
+                     FactorBis33 := Ley33Bis / RNvoValActivo;
+                     RDEPREC_PERIODO := RDEPREC_PERIODO - (RDEPREC_PERIODO + RDEPREC_ANUAL_NOM + RCorrDeprM)*FactorBis33;
+                  end;
+               end;
+        
+               oActivosLines     := oActivosData.Child('VID_AFSAR');
+               oActivosLinesData := oActivosLines.Add;
+               oActivosLinesData.SetProperty('U_Year'     , nxYr);
+               oActivosLinesData.SetProperty('U_CurVal'   , U_CurValR);
+               oActivosLinesData.SetProperty('U_CorAnuAc' , U_CorAnuAR);
+               oActivosLinesData.SetProperty('U_DepAcum'  , U_DepAcuR);
+               oActivosLinesData.SetProperty('U_DepAnual' , RDEPREC_PERIODO + RDEPREC_ANUAL_NOM + RCorrDeprM);
+               oActivosLinesData.SetProperty('U_DepAcumN' , RDEPREC_NOMINAL + U_DepAcuRN );
+               oActivosLinesData.SetProperty('U_CorAnuDe' , U_CorAnuDR);
+               oActivosLinesData.SetProperty('U_Adicion'  , ADICIONES_ANUALES);
+               oActivosLinesData.SetProperty('U_Bis33'    , Ley33Bis);
+            end;
+        
+            oActivosData.SetProperty('U_CorAnuAR',  U_CorAnuAR );
+            oActivosData.SetProperty('U_DepreAnR',  System.Double( oActivosData.GetProperty('U_DepreAnR')) + RDEPREC_PERIODO + RCorrDeprM );
+            oActivosData.SetProperty('U_DepAcuRN',  System.Double( oActivosData.GetProperty('U_DepAcuRN')) + RDEPREC_NOMINAL );
+            oActivosData.SetProperty('U_AdicAnuR',  ADICIONES_ANUALES);
+            oActivosData.SetProperty('U_CorAnuDR',  U_CorAnuDR );
+            oActivosData.SetProperty('U_PerVidaR',  System.Int32( oActivosData.GetProperty('U_PerVidaR')) + ActYearR[nxPr].AdicVid );
+            oActivosData.SetProperty('U_VidaUtiR',  System.Int32( oActivosData.GetProperty('U_VidaUtiR')) - RperDep + ActYearR[nxPr].AdicVid );
+            oActivosData.SetProperty('U_PRrDepre',  System.Int32( oActivosData.GetProperty('U_PRrDepre')) + RperDep );
+            oActivosData.SetProperty('U_PRrDepYr',  System.Int32( oActivosData.GetProperty('U_PRrDepYr')) + RperDep );
+            oActivosData.SetProperty('U_Bis33'   ,  Ley33Bis );
+
+            oActivosData.SetProperty('U_NextYear',  nxYrIns );
+            oActivosData.SetProperty('U_NextPer' ,  nxPrIns );
+            oActivosData.SetProperty('U_ValResid',  VALOR_RESIDUAL );
+   finally
+//      FSBOf._ReleaseCOMObject(oActivosLines);
+//      FSBOf._ReleaseCOMObject(oActivosLinesData);
+//      FSBOf._ReleaseCOMObject(oRecordActividad);
+   end;        
+end;
+
+method  TProcesoAF.ProcesoIFRS(var oActivosData, oParametrosData, oActivosLinesData: SAPbobsCOM.GeneralData; var oActivosLines: SAPbobsCOM.GeneralDataCollection; var oRecordActividad: SAPbobsCOM.RecordSet; nxYr, nxPr: integer; U_NewVidaUtil : Integer; U_NewVal : Double);
+var
+   i          : integer;
+
+   U_NextYear : integer;
+   U_NextPer  : integer;
+   U_NxYrDepr : integer;
+   U_NxPrDepr : integer;
+   U_InitYear : integer;
+   U_InitPer  : integer;
+   U_Orifec   : DateTime;
+   U_PorResid : double;
+
+   U_OriDepre : Double;
+   U_CurVal   : double;
+   U_DepAcum  : double;
+   U_DepreAnu : double;
+   U_PerDepre : integer;
+   U_PerDepYr : integer;
+   U_PerVidaU : integer;
+   U_AdicAnuc : Double;
+
+   Revalorizado   : boolean := false;
+   U_NewVal_Ant   : Double;
+   VIDA_UTIL_Ant  : Integer;
+   oPerPorDp      : Integer;
+
+   ADICIONES_ANUALES   : double;
+   ADICION_PERIODO     : Double;
+   ADIC_VUT_PERIODO    : Integer;
+   ValAux              : Double;
+
+   DEPREC_ANUAL_TOTAL  : double;
+   DEPREC_PERIODO      : double;
+   VIDA_UTIL           : integer;
+   UNID_DEPREC         : Integer;
+
+   PerDep               : integer;
+   Deprecia_Flag        : boolean;
+
+   s                : String;
+   nxYrIns, nxPrIns : Integer;
+   oYrReval         : Integer;
+   oPerReval        : Integer;
+   maxPerReval      : Integer;
+begin
+   try
+            // valores actuales del activo
+        
+            U_NextYear := System.Int32(oActivosData.GetProperty('U_NextYear'));
+            U_NextPer  := System.Int32(oActivosData.GetProperty('U_NextPer' ));
+            U_NxYrDepr := System.Int32(oActivosData.GetProperty('U_NxYrDepr'));
+            U_NxPrDepr := System.Int32(oActivosData.GetProperty('U_NxPrDepr'));
+            U_InitYear := System.Int32(oActivosData.GetProperty('U_InitYear'));
+            U_InitPer  := System.Int32(oActivosData.GetProperty('U_InitPer' ));
+            U_OriFec   := System.DateTime(oActivosData.GetProperty('U_OriFec'));
+            U_PorResid := 1-System.Double(oActivosData.GetProperty('U_PorResid'))/100;
+            VIDA_UTIL  := System.int32(oActivosData.GetProperty('U_VidaUtil'));
+                
+            U_OriDepre := System.Double(oActivosData.GetProperty('U_OriDepre'));    //  ANT_DEPRECIACION_ORIGINAL
+            U_CurVal   := System.Double(oActivosData.GetProperty('U_CurVal'  ));    //  ANT_VALOR_ACTUAL
+            U_DepAcum  := System.Double(oActivosData.GetProperty('U_DepAcum' ));    //  ANT_DEPRACUMULADA
+            U_DepreAnu := System.Double(oActivosData.GetProperty('U_DepreAnu'));    //  ANT_DEPRANUAL
+            U_PerDepre := System.Int32(oActivosData.GetProperty ('U_PerDepre'));    //  ANT_PERDEPRECIADOS
+            U_PerDepYr := System.Int32(oActivosData.GetProperty ('U_PerDepYr'));    //  ANT_PERDEPRECYEAR
+            U_PerVidaU := System.Int32(oActivosData.GetProperty ('U_PerVidaU'));    //  ANT_VIDAUTIL
+            U_AdicAnuc := System.double(oActivosData.GetProperty('U_AdicAnuC'));    //  ANT_ADIC_ANUAL
+
+            // Usado en reval
+            Revalorizado     := false;
+            U_NewVal_Ant     := U_CurVal;
+            VIDA_UTIL_Ant    := VIDA_UTIL;
+            ADIC_VUT_PERIODO := 0;
+            ADICION_PERIODO  := 0;
+        
+            // Actualiza VID_AFAS
+            if (nxPr = 1) then begin
+               U_DepAcum  := U_DepAcum + U_DepreAnu;
+               U_Curval   := U_Curval + U_AdicAnuc; // Revisar si suma o no adiciones
+               U_DepreAnu := 0;
+               U_PerDepYr := 0;
+               U_AdicAnuc := 0;
+        
+               oActivosData.SetProperty('U_CurVal'  , U_CurVal   );
+               oActivosData.SetProperty('U_DepAcum' , U_DepAcum  );
+               oActivosData.SetProperty('U_DepreAnu', U_DepreAnu );
+               oActivosData.SetProperty('U_PerDepYr', U_PerDepYr );
+               oActivosData.SetProperty('U_AdicAnuC', U_AdicAnuc );
+            end;
+
+            // Utima revalorizacion del año de proceso
+            oPerReval   := nxPr - 1;
+            oYrReval    := nxYr;
+            maxPerReval := 0;
+            if (nxPr = 1) then begin
+               oPerReval := 12;
+               oYrReval  := nxYr - 1;
+            end;
+
+            UNID_DEPREC := 0;
+            if (System.String(oActivosData.GetProperty('U_TipoDep')) = 'U') then begin
+               s := "select isnull(d.U_Uso,0) Uso " +
+                    "  from [@VID_AFUS] h inner join [@VID_AFUSD] d on h.DocEntry = d.DocEntry " +
+                    " where h.U_Year    = " + nxYr.ToString +
+                    "   and h.U_Periodo = " + nxPr.ToString +
+                    "   and d.U_ActCode = " + TMultiFunctions.QuotedStr(System.String(oActivosData.GetProperty('U_ActCode'))) ;
+                oRecordActividad.DoQuery(s);
+                if (not oRecordActividad.EoF) then
+                   UNID_DEPREC := System.Int32(oRecordActividad.Fields.Item('Uso').Value);
+             end
+             else 
+                UNID_DEPREC := 1;
+
+            oRecordActividad.DoQuery("Select d.U_NewVal, d.U_PerPorDp, h.DocEntry " +
+                                     " from [@VID_AFREV] h inner join [@VID_AFREVD] d on h.DocEntry = d.DocEntry " +
+                                     " where h.U_Year    =  " + oYrReval.ToString +
+                                     "   and h.U_Periodo =  " + oPerReval.ToString +
+                                     "   and d.U_ActCode =  " + TMultiFunctions.QuotedStr(oActivosData.GetProperty('U_ActCode').ToString));
+            if (not oRecordActividad.EoF) then begin
+               Revalorizado   := true;
+               //Curval - Depreciaicon = Revalorizacion
+               VIDA_UTIL_Ant := VIDA_UTIL;
+               oPerPorDp := System.Int32(oRecordActividad.Fields.Item('U_PerPorDp').Value);
+               if (oPerPorDp > 0) then
+                  VIDA_UTIL := oPerPorDp;
+
+               U_Curval       := U_DepAcum + U_DepreAnu + System.Double(oRecordActividad.Fields.Item('U_NewVal').Value);
+               oActivosData.SetProperty('U_CurVal'  , U_CurVal   );
+            end
+            else begin
+               oRecordActividad.DoQuery("Select isnull(MAX(U_Periodo),0) per " +
+                                        " from [@VID_AFREV] h inner join [@VID_AFREVD] d on h.DocEntry = d.DocEntry " +
+                                        " where h.U_Year    =  " + oYrReval.ToString +
+                                        "   and h.U_Periodo <  " + oPerReval.ToString +
+                                        "   and d.U_ActCode =  " + TMultiFunctions.QuotedStr(oActivosData.GetProperty('U_ActCode').ToString));
+               maxPerReval := System.Int32(oRecordActividad.Fields.Item('per').Value);
+            end;
+
+            //... Marcar ... VID_AFAD para el periodo como procesado
+            ADICIONES_ANUALES := 0;
+            oActivosLines     := oActivosData.Child('VID_AFAD'); 
+            for i:=0 to oActivosLines.Count - 1 do begin
+               oActivosLinesData := oActivosLines.Item(i);
+
+               // Excluye adiciones posteriores
+               if (System.Int32(oActivosLinesData.GetProperty('U_Year')) > nxYr) or 
+                  ((System.Int32(oActivosLinesData.GetProperty('U_Year')) = nxYr) and (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) > nxPr)) then
+                  continue;
+
+               // Excluye adiciones anteriores a revalorizacion
+               if (System.Int32(oActivosLinesData.GetProperty('U_Year')) = nxYr) and (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) <= maxPerReval) then
+                  continue;
+
+               if (System.int32(oActivosLinesData.GetProperty('U_Year')) = nxYr) then
+                  ADICIONES_ANUALES := ADICIONES_ANUALES + System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+
+               if (System.int32(oActivosLinesData.GetProperty('U_Year')) = nxYr) and (System.int32(oActivosLinesData.GetProperty('U_Periodo')) = nxPr) then begin
+                  s := 'Y';
+                  oActivosLinesData.SetProperty('U_Procesad', s);
+                  ADICION_PERIODO := System.Double(oActivosLinesData.GetProperty('U_ValorAct'));
+                  if (System.String(oParametrosData.GetProperty('U_AdicVdUt')).Trim = 'Y') then
+                     ADIC_VUT_PERIODO := System.Int32(oActivosLinesData.GetProperty('U_PerVidUt'));
+               end;
+            end;
+        
+            //Obtener de consulta de activos, pasar como parametros
+            if (Revalorizado) then begin
+               ADICION_PERIODO   := 0;
+               ADIC_VUT_PERIODO  := 0;
+               ADICIONES_ANUALES := 0;
+            end; 
+
+            // Determinar si debe depreciarse o no        
+            Deprecia_Flag  := False;
+            if (System.String(oActivosData.GetProperty('U_ConDepre')) = 'Y') and ((nxYr > U_NxYrDepr) or ((nxYr = U_NxYrDepr) and (nxPr >= U_NxPrDepr))) then 
+               Deprecia_Flag  := true;
+            if (VIDA_UTIL <= 0) then
+               Deprecia_Flag := False;
+           
+            // Depreciar
+            DEPREC_PERIODO      := 0;
+            DEPREC_ANUAL_TOTAL  := 0;
+                                
+            if (VIDA_UTIL > 0) and (Deprecia_Flag) then
+               DEPREC_PERIODO := ((U_CurVal + ADICIONES_ANUALES) * U_PorResid - U_DepAcum - U_DepreAnu) * UNID_DEPREC / VIDA_UTIL;
+                
+            // Depreciacion del mes
+            perDep    := 0;
+            if (Deprecia_Flag) then begin
+               if (VIDA_UTIL > 0) then
+                  perDep   := UNID_DEPREC
+               else 
+                  DEPREC_PERIODO := 0;
+            end
+            else 
+               DEPREC_PERIODO := 0;
+                
+            s := 'N';
+            oActivosLines     := oActivosData.Child('VID_AFAC');
+            oActivosLinesData := oActivosLines.Add;
+
+            //Obtener de consulta de activos, pasar como parametros
+            if (Revalorizado) then begin
+               oActivosLinesData.SetProperty('U_RvNewVUt'  , VIDA_UTIL   );
+               oActivosLinesData.SetProperty('U_RvOldVUt'  , VIDA_UTIL_Ant   );
+               oActivosLinesData.SetProperty('U_RvNewVal'  , U_Curval   );
+               oActivosLinesData.SetProperty('U_RvOldVal'  , U_NewVal_Ant   );
+            end;
+
+            oActivosLinesData.SetProperty('U_Year'    , nxYr);
+            oActivosLinesData.SetProperty('U_Periodo' , nxPr);
+            oActivosLinesData.SetProperty('U_Deprecia', DEPREC_PERIODO);
+            oActivosLinesData.SetProperty('U_Adicion' , ADICION_PERIODO);
+            oActivosLinesData.SetProperty('U_PerVidUt', ADIC_VUT_PERIODO);
+            oActivosLinesData.SetProperty('U_PerDepre', perDep);
+            oActivosLinesData.SetProperty('U_PostFlag', s);
+        
+            //............. Anual..........
+        
+            if (nxPr = 12) then begin
+               nxYrIns := nxYr + 1;
+               nxPrIns := 1;
+            end
+            else begin
+               nxYrIns := nxYr;
+               nxPrIns := nxPr + 1;
+            end;
+        
+            if (nxPrIns = 1) then begin
+               // actualizo información anual
+               s := 'Select isnull(sum(U_Deprecia),0) DeprYear ' +
+                    '  from [@VID_AFAC] ' +
+                    ' where code = ' + TMultiFunctions.QuotedStr(System.String(oActivosData.GetProperty('Code'))) +
+                    '   and U_Year = ' + nxYr.ToString ;
+               oRecordActividad.DoQuery(s);
+               if (oRecordActividad.EoF) then 
+                  ValAux := 0
+               else 
+                  ValAux := System.Double(oRecordActividad.Fields.Item('DeprYear').Value);
+
+               oActivosLines     := oActivosData.Child('VID_AFSA');
+               oActivosLinesData := oActivosLines.Add;
+               oActivosLinesData.SetProperty('U_Year'     , nxYr);
+               oActivosLinesData.SetProperty('U_CurVal'   , U_CurVal);
+               oActivosLinesData.SetProperty('U_DepAcum'  , U_DepAcum + ValAux);
+               oActivosLinesData.SetProperty('U_DepAnual' , DEPREC_PERIODO + ValAux);
+               oActivosLinesData.SetProperty('U_Adicion'  , ADICIONES_ANUALES);
+        
+            end;
+        
+            oActivosData.SetProperty('U_DepreAnu',  System.Double( oActivosData.GetProperty('U_DepreAnu')) + DEPREC_PERIODO);
+            oActivosData.SetProperty('U_AdicAnuC',  ADICIONES_ANUALES);
+            oActivosData.SetProperty('U_PerVidaU',  System.Int32( oActivosData.GetProperty('U_PerVidaU')) + ADIC_VUT_PERIODO );
+            oActivosData.SetProperty('U_VidaUtil',  System.Int32( oActivosData.GetProperty('U_VidaUtil')) - perDep + ADIC_VUT_PERIODO);
+            oActivosData.SetProperty('U_PerDepre',  System.Int32( oActivosData.GetProperty('U_PerDepre')) + perDep );
+            oActivosData.SetProperty('U_PerDepYr',  System.Int32( oActivosData.GetProperty('U_PerDepYr')) + perDep );
+            oActivosData.SetProperty('U_NextYear',  nxYrIns );
+            oActivosData.SetProperty('U_NextPer' ,  nxPrIns );
+   finally
+//      FSBOf._ReleaseCOMObject(oActivosLines);
+//      FSBOf._ReleaseCOMObject(oActivosLinesData);
+//      FSBOf._ReleaseCOMObject(oRecordActividad);
+   end;
+end;
+
+method TProcesoAF.ReversarProcesoFinanciero(var oActivosData, oParametrosData: SAPbobsCOM.GeneralData; vyear, vperiod : integer);
+var
+   s              : string;
+   i, j           : Integer;
+
+   oActivosLines      : SAPbobsCOM.GeneralDataCollection;
+   oActivosLinesData  : SAPbobsCOM.GeneralData;
+   oActivosLines2     : SAPbobsCOM.GeneralDataCollection;
+   oActivosLines2Data : SAPbobsCOM.GeneralData;
+
+   oValor             : Double;
+   oValor_residual    : double;
+begin
+   try
+         oActivosLines     := oActivosData.Child('VID_AFAC');
+
+         oValor   := 0;
+         i        := 0;
+         while i <= oActivosLines.Count - 1 do  begin
+            oActivosLinesData := oActivosLines.Item(i);
+            if (System.Int32(oActivosLinesData.GetProperty('U_Year')) <> vyear) then begin
+                inc(i);
+                Continue;
+            end
+            else if (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) < vperiod) then begin
+               oValor   := oValor + System.Double(oActivosLinesData.GetProperty('U_Adicion'));
+               inc(i);
+               Continue;
+            end;
+
+             oActivosData.SetProperty('U_CorAnuAc',  System.Double( oActivosData.GetProperty('U_CorAnuAc')) - System.Double(oActivosLinesData.GetProperty('U_CorrActi')) );
+             oActivosData.SetProperty('U_DepreAnu',  System.Double( oActivosData.GetProperty('U_DepreAnu')) - System.Double(oActivosLinesData.GetProperty('U_Deprecia'))
+                                                                                                            - System.Double(oActivosLinesData.GetProperty('U_CorrDepM')) );
+             oActivosData.SetProperty('U_DepAcumN',  System.Double( oActivosData.GetProperty('U_DepAcumN')) - System.Double(oActivosLinesData.GetProperty('U_DeprNom' )) );
+             oActivosData.SetProperty('U_CorAnuDe',  System.Double( oActivosData.GetProperty('U_CorAnuDe')) - System.Double(oActivosLinesData.GetProperty('U_CorrDepr')) );
+
+             oActivosData.SetProperty('U_PerVidaU',  System.Int32 ( oActivosData.GetProperty('U_PerVidaU')) - System.Int32(oActivosLinesData.GetProperty('U_PerVidUt')) );
+             oActivosData.SetProperty('U_VidaUtil',  System.Int32 ( oActivosData.GetProperty('U_VidaUtil')) + System.Int32(oActivosLinesData.GetProperty('U_PerDepre'))
+                                                                                                            - System.Int32(oActivosLinesData.GetProperty('U_PerVidUt')) );
+             oActivosData.SetProperty('U_PerDepre',  System.Int32 ( oActivosData.GetProperty('U_PerDepre')) - System.Int32(oActivosLinesData.GetProperty('U_PerDepre')) );
+             oActivosData.SetProperty('U_PerDepYr',  System.Int32 ( oActivosData.GetProperty('U_PerDepYr')) - System.Int32(oActivosLinesData.GetProperty('U_PerDepre')) );
+
+             oActivosData.SetProperty('U_AdicAnuC',  oValor );
+
+             oValor_residual := 0;
+             if (System.Int32 ( oActivosData.GetProperty('U_VidaUtil') )  <= 0) then
+                oValor_residual := System.Double(oParametrosData.GetProperty('U_ValResid'));
+             oActivosData.SetProperty('U_ValResid',  oValor_residual );
+
+             oActivosLines.Remove(i);
+
+             oActivosLines2     := oActivosData.Child('VID_AFAD');
+            for j := 0 to oActivosLines2.Count - 1 do  begin
+                oActivosLines2Data := oActivosLines2.Item(j);
+                if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear) or (System.Int32(oactivosLines2Data.GetProperty('U_Periodo')) <> vperiod) then
+                   Continue;
+
+                s := 'N';
+                oActivosLines2Data.SetProperty('U_Procesad', s);
+            end;
+
+            if (vperiod = 1) then begin
+                oActivosLines2 := oActivosData.Child('VID_AFSA');
+
+               for j := 0 to oActivosLines2.Count - 1 do  begin
+                  oActivosLines2Data := oActivosLines2.Item(j);
+                  if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear-1) then
+                     Continue;
+
+                  oActivosData.SetProperty('U_CurVal'   ,  System.Double( oActivosLines2Data.GetProperty('U_CurVal'  )) );
+                  oActivosData.SetProperty('U_DepAcum'  ,  System.Double( oActivosLines2Data.GetProperty('U_DepAcum' )) );
+                  oActivosData.SetProperty('U_CorAnuAc' ,  System.Double( oActivosLines2Data.GetProperty('U_CorAnuAc')) );
+                  oActivosData.SetProperty('U_DepreAnu' ,  System.Double( oActivosLines2Data.GetProperty('U_DepAnual')) );
+                  oActivosData.SetProperty('U_AdicAnuC' ,  System.Double( oActivosLines2Data.GetProperty('U_Adicion' )) );
+                  oActivosData.SetProperty('U_Bis33Fin' ,  System.Double( oActivosLines2Data.GetProperty('U_Bis33'   )) );
+                  oActivosData.SetProperty('U_CorAnuDe' ,  System.Double( oActivosLines2Data.GetProperty('U_CorAnuDe')) );
+                  oActivosData.SetProperty('U_PerDepYr' ,  System.Int32 ( 0 ));
+               end;
+            end
+            else begin
+               oValor := 0;
+               oActivosData.SetProperty('U_Bis33Fin' ,  oValor );
+            end;
+
+            if (vperiod = 12) then begin
+                oActivosLines2     := oActivosData.Child('VID_AFSA');
+
+               j := 0;
+               while j <= oActivosLines2.Count - 1 do  begin
+                  oActivosLines2Data := oActivosLines2.Item(j);
+                  if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear) then begin
+                     inc(j);
+                     Continue;
+                  end;
+
+                   oActivosLines2.Remove(j);
+               end;
+            end;
+         end;
+   finally
+//      FSBOf._ReleaseCOMObject(oActivosLines);
+//      FSBOf._ReleaseCOMObject(oActivosLinesData);
+//      FSBOf._ReleaseCOMObject(oActivosLines2);
+//      FSBOf._ReleaseCOMObject(oActivosLines2Data);
+   end;
+end;
+
+method TProcesoAF.ReversarProcesoReferencial(var oActivosData, oParametrosData: SAPbobsCOM.GeneralData; vyear, vperiod : integer);
+var
+   i, j           : Integer;
+
+   oActivosLines      : SAPbobsCOM.GeneralDataCollection;
+   oActivosLinesData  : SAPbobsCOM.GeneralData;
+   oActivosLines2     : SAPbobsCOM.GeneralDataCollection;
+   oActivosLines2Data : SAPbobsCOM.GeneralData;
+
+   oValor             : Double;
+begin
+   try
+         oActivosLines     := oActivosData.Child('VID_AFACR');
+
+         oValor   := 0;
+         i        := 0;
+         while i <= oActivosLines.Count - 1 do  begin
+            oActivosLinesData := oActivosLines.Item(i);
+            if (System.Int32(oActivosLinesData.GetProperty('U_Year')) <> vyear) then begin
+                inc(i);
+                Continue;
+            end
+            else if (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) < vperiod) then begin
+               oValor := oValor + System.Double(oActivosLinesData.GetProperty('U_Adicion'));
+               inc(i);
+               Continue;
+            end;
+
+             oActivosData.SetProperty('U_CorAnuAR',  System.Double( oActivosData.GetProperty('U_CorAnuAR')) - System.Double(oActivosLinesData.GetProperty('U_CorrActi')) );
+             oActivosData.SetProperty('U_DepreAnR',  System.Double( oActivosData.GetProperty('U_DepreAnR')) - System.Double(oActivosLinesData.GetProperty('U_Deprecia'))
+                                                                                                            - System.Double(oActivosLinesData.GetProperty('U_CorrDepM')) );
+             oActivosData.SetProperty('U_DepAcuRN',  System.Double( oActivosData.GetProperty('U_DepAcuRN')) - System.Double(oActivosLinesData.GetProperty('U_DeprNom' )) );
+             oActivosData.SetProperty('U_AdicAnuR',  System.Double( oActivosData.GetProperty('U_AdicAnuR')) - System.Double(oActivosLinesData.GetProperty('U_Adicion' )) );
+             oActivosData.SetProperty('U_CorAnuDR',  System.Double( oActivosData.GetProperty('U_CorAnuDR')) - System.Double(oActivosLinesData.GetProperty('U_CorrDepr')) );
+
+             oActivosData.SetProperty('U_PerVidaR',  System.Int32 ( oActivosData.GetProperty('U_PerVidaR')) - System.Int32(oActivosLinesData.GetProperty('U_PerVidUt')) );
+             oActivosData.SetProperty('U_VidaUtiR',  System.Int32 ( oActivosData.GetProperty('U_VidaUtiR')) + System.Int32(oActivosLinesData.GetProperty('U_PerDepre'))
+                                                                                                            - System.Int32(oActivosLinesData.GetProperty('U_PerVidUt')) );
+             oActivosData.SetProperty('U_PRrDepre',  System.Int32 ( oActivosData.GetProperty('U_PRrDepre')) - System.Int32(oActivosLinesData.GetProperty('U_PerDepre')) );
+             oActivosData.SetProperty('U_PRrDepYr',  System.Int32 ( oActivosData.GetProperty('U_PRrDepYr')) - System.Int32(oActivosLinesData.GetProperty('U_PerDepre')) );
+
+             oActivosData.SetProperty('U_AdicAnuR',  oValor );
+
+             oActivosLines.Remove(i);
+
+            if (vperiod = 1) then begin
+                oActivosLines2     := oActivosData.Child('VID_AFSAR');
+
+               for j := 0 to oActivosLines2.Count - 1 do  begin
+                  oActivosLines2Data := oActivosLines2.Item(j);
+                  if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear-1) then
+                     Continue;
+
+                  oActivosData.SetProperty('U_CurValR'  ,  System.Double( oActivosLines2Data.GetProperty('U_CurVal'  )) );
+                  oActivosData.SetProperty('U_DepAcuR'  ,  System.Double( oActivosLines2Data.GetProperty('U_DepAcum' )) );
+                  oActivosData.SetProperty('U_CorAnuAR' ,  System.Double( oActivosLines2Data.GetProperty('U_CorAnuAc')) );
+                  oActivosData.SetProperty('U_DepreAnR' ,  System.Double( oActivosLines2Data.GetProperty('U_DepAnual')) );
+                  oActivosData.SetProperty('U_AdicAnuR' ,  System.Double( oActivosLines2Data.GetProperty('U_Adicion' )) );
+                  oActivosData.SetProperty('U_Bis33'    ,  System.Double( oActivosLines2Data.GetProperty('U_Bis33'   )) );
+                  oActivosData.SetProperty('U_CorAnuDR' ,  System.Double( oActivosLines2Data.GetProperty('U_CorAnuDe')) );
+                  oActivosData.SetProperty('U_PRrDepYr' ,  System.Int32 ( 0 ));
+               end;
+            end
+            else begin
+               oValor := 0;
+               oActivosData.SetProperty('U_Bis33' ,  oValor );
+            end;
+
+            if (vperiod = 12) then begin
+                oActivosLines2     := oActivosData.Child('VID_AFSAR');
+
+               j := 0;
+               while j <= oActivosLines2.Count - 1 do  begin
+                  oActivosLines2Data := oActivosLines2.Item(j);
+                  if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear) then begin
+                     inc(j);
+                     Continue;
+                  end;
+
+                   oActivosLines2.Remove(j);
+               end;
+            end;
+         end;
+   finally
+//      FSBOf._ReleaseCOMObject(oActivosLines);
+//      FSBOf._ReleaseCOMObject(oActivosLinesData);
+//      FSBOf._ReleaseCOMObject(oActivosLines2);
+//      FSBOf._ReleaseCOMObject(oActivosLines2Data);
+   end;
+end;
+
+method  TProcesoAF.ReversarProcesoIFRS(var oActivosData, oParametrosData: SAPbobsCOM.GeneralData; vyear, vperiod : integer);
+var
+   i, j           : Integer;
+   s              : String;
+
+   oActivosLines      : SAPbobsCOM.GeneralDataCollection;
+   oActivosLinesData  : SAPbobsCOM.GeneralData;
+   oActivosLines2     : SAPbobsCOM.GeneralDataCollection;
+   oActivosLines2Data : SAPbobsCOM.GeneralData;
+
+   oNewVal            : Double;
+   oOldVal            : Double;
+   oNewVidUt          : Integer;
+   oOldVidUt          : Integer;
+begin
+   try
+         oActivosLines     := oActivosData.Child('VID_AFAC');
+
+         i        := 0;
+         while i <= oActivosLines.Count - 1 do  begin
+            oActivosLinesData := oActivosLines.Item(i);
+            if (System.Int32(oActivosLinesData.GetProperty('U_Year')) <> vyear) or (System.Int32(oactivosLinesData.GetProperty('U_Periodo')) <> vperiod) then begin
+                inc(i);
+                Continue;
+            end;
+
+            oNewVal   := System.Double(oActivosLinesData.GetProperty('U_RvNewVal'));
+            oOldVal   := System.Double(oActivosLinesData.GetProperty('U_RvOldVal'));
+            oNewVidUt := System.Int32(oActivosLinesData.GetProperty('U_RvNewVUt'));
+            oOldVidUt := System.Int32(oActivosLinesData.GetProperty('U_RvOldVUt'));
+
+             oActivosData.SetProperty('U_DepreAnu',  System.Double( oActivosData.GetProperty('U_DepreAnu')) - System.Double(oActivosLinesData.GetProperty('U_Deprecia')));
+
+             if (oNewVal <> 0) then begin
+                oActivosData.SetProperty('U_CurVal', System.Double ( oActivosLinesData.GetProperty('U_RvOldVal')));
+             end;
+             if (oNewVidUt <> 0) then begin
+                oActivosData.SetProperty('U_VidaUtil', System.Int32 ( oActivosLinesData.GetProperty('U_RvOldVUt')));
+             end;
+             if (oNewVidUt = 0) then begin
+                oActivosData.SetProperty('U_VidaUtil',  System.Int32 ( oActivosData.GetProperty('U_VidaUtil')) + System.Int32(oActivosLinesData.GetProperty('U_PerDepre'))
+                                                                                                               - System.Int32(oActivosLinesData.GetProperty('U_PerVidUt')) );
+             end;
+
+             oActivosData.SetProperty('U_PerVidaU',  System.Int32 ( oActivosData.GetProperty('U_PerVidaU')) - System.Int32(oActivosLinesData.GetProperty('U_PerVidUt')) );
+             oActivosData.SetProperty('U_PerDepre',  System.Int32 ( oActivosData.GetProperty('U_PerDepre')) - System.Int32(oActivosLinesData.GetProperty('U_PerDepre')) );
+             oActivosData.SetProperty('U_PerDepYr',  System.Int32 ( oActivosData.GetProperty('U_PerDepYr')) - System.Int32(oActivosLinesData.GetProperty('U_PerDepre')) );
+
+             oActivosLines.Remove(i);
+
+             oActivosLines2     := oActivosData.Child('VID_AFAD');
+             for j := 0 to oActivosLines2.Count - 1 do  begin
+                oActivosLines2Data := oActivosLines2.Item(j);
+                if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear) or (System.Int32(oactivosLines2Data.GetProperty('U_Periodo')) <> vperiod) then
+                   Continue;
+
+                s := 'N';
+                oActivosLines2Data.SetProperty('U_Procesad', s);
+             end;
+
+             if (vperiod = 1) then begin
+                oActivosLines2 := oActivosData.Child('VID_AFSA');
+
+                for j := 0 to oActivosLines2.Count - 1 do  begin
+                  oActivosLines2Data := oActivosLines2.Item(j);
+                  if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear-1) then
+                     Continue;
+
+                  oActivosData.SetProperty('U_CurVal'   ,  System.Double( oActivosLines2Data.GetProperty('U_CurVal'  )) );
+                  oActivosData.SetProperty('U_DepAcum'  ,  System.Double( oActivosLines2Data.GetProperty('U_DepAcum' )) );
+                  oActivosData.SetProperty('U_DepAcumN' ,  System.Double( oActivosLines2Data.GetProperty('U_DepAcumN')) );
+                  oActivosData.SetProperty('U_CorAnuAc' ,  System.Double( oActivosLines2Data.GetProperty('U_CorAnuAc')) );
+                  oActivosData.SetProperty('U_DepreAnu' ,  System.Double( oActivosLines2Data.GetProperty('U_DepAnual')) );
+                  oActivosData.SetProperty('U_AdicAnuC' ,  System.Double( oActivosLines2Data.GetProperty('U_Adicion' )) );
+                  oActivosData.SetProperty('U_CorAnuDe' ,  System.Double( oActivosLines2Data.GetProperty('U_CorAnuDe')) );
+                  oActivosData.SetProperty('U_PerDepYr' ,  System.Int32 ( 0 ));
+               end;
+             end;
+
+            if (vperiod = 12) then begin
+                oActivosLines2     := oActivosData.Child('VID_AFSA');
+
+               j := 0;
+               while j <= oActivosLines2.Count - 1 do  begin
+                  oActivosLines2Data := oActivosLines2.Item(j);
+                  if (System.Int32(oActivosLines2Data.GetProperty('U_Year')) <> vyear) then begin
+                     inc(j);
+                     Continue;
+                  end;
+
+                   oActivosLines2.Remove(j);
+               end;
+            end;
+         end;
+   finally
+//      FSBOf._ReleaseCOMObject(oActivosLines);
+//      FSBOf._ReleaseCOMObject(oActivosLinesData);
+//      FSBOf._ReleaseCOMObject(oActivosLines2);
+//      FSBOf._ReleaseCOMObject(oActivosLines2Data);
+   end;
+end;
+
+method TProcesoAF.ActualizarRevalIFRS();
+var
+   oSql : String;
+begin
+   oSql := "Update [@VID_AFREV] set U_Procesad = 'Y' where Docentry = ";
+   oSql := "Update [@VID_AFREVD] set U_ReaDet = ....., U_OldVal = ....., U_Account = ...... " +
+           " Where Docentry = ..... and U_ActCode = ......";
+end;
+
+method TProcesoAF.ActualizarVentaIFRS();
+begin
+
+end;
+
+end.
